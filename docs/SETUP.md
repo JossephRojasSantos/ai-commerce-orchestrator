@@ -36,6 +36,13 @@ git clone <URL-del-repositorio>
 cd ai-commerce-orchestrator
 ```
 
+Output esperado:
+
+```
+Cloning into 'ai-commerce-orchestrator'...
+remote: Enumerating objects: ...
+```
+
 ### Paso 2 — Configurar variables de entorno
 
 ```bash
@@ -51,6 +58,8 @@ Abre `.env` y edita al menos:
 
 > Las demás variables tienen valores por defecto válidos para desarrollo local.
 > **No commitees** el archivo `.env` — está en `.gitignore`.
+
+Output esperado: ninguno — el comando no produce salida si se ejecuta correctamente.
 
 ### Paso 3 — Validar configuración
 

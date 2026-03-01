@@ -215,6 +215,36 @@ verifica tu conexión y que Docker Hub sea accesible.
 
 ---
 
+## 5. Servicios adicionales (AI-16)
+
+### Puertos expuestos
+
+| Servicio | Puerto host | Puerto contenedor | Variable |
+|----------|------------|-------------------|----------|
+| backend | 8000 | 8000 | `BACKEND_PORT` |
+| db (PostgreSQL 16) | 5432 | 5432 | `DB_PORT` |
+| redis | 6379 | 6379 | `REDIS_PORT` |
+| rabbitmq (AMQP) | 5672 | 5672 | `RABBITMQ_PORT` |
+| rabbitmq (Management UI) | 15672 | 15672 | `RABBITMQ_MGMT_PORT` |
+
+### RabbitMQ Management UI
+
+Disponible en http://localhost:15672 una vez levantado `docker compose up rabbitmq`.
+
+Credenciales por defecto: usuario `guest` / contraseña `guest` (cambiar en `.env` para producción).
+
+### Smoke test
+
+Verificar conectividad de todos los servicios:
+
+```bash
+bash scripts/smoke-test.sh
+```
+
+Salida esperada: `✅ 4 pasaron | ❌ 0 fallaron`.
+
+---
+
 ## Comandos rápidos
 
 Para la referencia completa de comandos de desarrollo ver el [README.md](../README.md).

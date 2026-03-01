@@ -36,6 +36,8 @@ git clone <URL-del-repositorio>
 cd ai-commerce-orchestrator
 ```
 
+> La URL del repositorio se encuentra en la página del proyecto en GitHub.
+
 Output esperado:
 
 ```
@@ -45,21 +47,19 @@ remote: Enumerating objects: ...
 
 ### Paso 2 — Configurar variables de entorno
 
-```bash
-cp .env.example .env
-```
-
-Abre `.env` y edita al menos:
+`make setup` crea `.env` automáticamente desde `.env.example` si no existe.
+Edita el archivo `.env` y completa al menos:
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
 | `DB_PASSWORD` | Contraseña de PostgreSQL | `mi_password_seguro` |
 | `LLM_API_KEY` | API Key de OpenAI | `sk-...` |
 
-> Las demás variables tienen valores por defecto válidos para desarrollo local.
+> Las demás variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `REDIS_HOST`, `REDIS_PORT`)
+> tienen valores por defecto válidos para desarrollo local en `.env.example`.
 > **No commitees** el archivo `.env` — está en `.gitignore`.
 
-Output esperado: ninguno — el comando no produce salida si se ejecuta correctamente.
+Output esperado: ninguno — es solo edición manual del archivo `.env`.
 
 ### Paso 3 — Validar configuración
 
@@ -86,7 +86,8 @@ make up
 Output esperado (puede tomar 1-2 min la primera vez mientras descarga imágenes):
 
 ```
-✅ Servicios iniciados en background.
+🚀 Levantando servicios...
+  ✅ Servicios corriendo. Verifica con: docker ps
 ```
 
 ### Paso 5 — Verificar que los servicios están saludables
@@ -98,10 +99,10 @@ docker compose -f infra/docker-compose.yml ps
 Output esperado — los 3 servicios deben aparecer como `healthy`:
 
 ```
-NAME                 IMAGE                COMMAND              STATUS
-infra-backend-1      python:3.11-slim     "python -m http..."  Up (healthy)
-infra-db-1           postgres:15-alpine   "docker-entryp..."   Up (healthy)
-infra-redis-1        redis:7-alpine       "docker-entryp..."   Up (healthy)
+NAME          IMAGE                COMMAND                 STATUS
+ai-backend    python:3.11-slim     "python -m http..."     Up (healthy)
+ai-db         postgres:15-alpine   "docker-entrypoint…"    Up (healthy)
+ai-redis      redis:7-alpine       "docker-entrypoint…"    Up (healthy)
 ```
 
 > Si algún servicio aparece como `starting` espera 30 segundos y repite el comando.
@@ -145,6 +146,7 @@ PONG
 ```
 
 Si los tres comandos dan el output esperado, el entorno está correctamente configurado.
+Si alguno falla, revisa la sección [Troubleshooting](#4-troubleshooting) o ejecuta `make logs` para ver los logs de los servicios.
 
 ---
 
@@ -179,6 +181,8 @@ Verifica: `docker info` no debe mostrar errores.
 ```bash
 # Ejemplo: cambiar puerto de PostgreSQL a 5433
 DB_PORT=5433
+# O cambiar el puerto de Redis
+REDIS_PORT=6380
 ```
 
 Reinicia: `make restart`

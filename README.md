@@ -24,10 +24,10 @@ git clone <repo-url>
 cd ai-commerce-orchestrator
 
 # 2. Configurar entorno
-make setup       # Copia .env.example → .env y valida variables
+make setup       # Sincroniza .env con .env.example y valida variables
 
 # 3. Levantar servicios
-make up          # Inicia backend, DB y Redis en Docker
+make up          # Inicia backend, DB, Redis y RabbitMQ en Docker
 
 # 4. Ver logs
 make logs
@@ -46,7 +46,30 @@ Consulta [`docs/SETUP.md`](docs/SETUP.md) para la guía completa de instalación
 | `make logs` | Logs en tiempo real |
 | `make lint` | Ejecuta linter |
 | `make test` | Ejecuta tests |
+| `make cli-build` | Compila 3 binaries del CLI en `dist/` |
+| `make cli-build-local` | Compila `bin/ai-commerce-cli` |
+| `make cli-test` | Ejecuta tests de CLI (Go) |
+| `make cli-lint` | Ejecuta lint de CLI (Go) |
 | `make clean` | Elimina contenedores y volúmenes |
+
+## CLI Tool (AI-130)
+
+```bash
+# Compilar binary local
+make cli-build-local
+
+# Compilar binaries multiplataforma
+make cli-build
+
+# Validar entorno
+./bin/ai-commerce-cli setup
+
+# Verificar salud del backend
+./bin/ai-commerce-cli health --url http://localhost:8000
+
+# Disparar reindexacion RAG
+ADMIN_API_KEY=xxx ./bin/ai-commerce-cli ingest --url http://localhost:8000
+```
 
 ## Requisitos
 

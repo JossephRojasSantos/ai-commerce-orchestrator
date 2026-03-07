@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cli/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'cli/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  cli-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: cli/go.sum
+
+      - name: Lint with golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          working-directory: cli
+          args: --timeout=5m
+
+      - name: Test with coverprofile
+        run: make test-cover
+
+      - name: Validate coverage gate (>=70%)
+        run: |
+          coverage=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          awk -v pct="$coverage" 'BEGIN { if (pct + 0 < 70) { printf("Coverage %.2f%% below 70%%\n", pct); exit 1 } else { printf("Coverage %.2f%% OK\n", pct) } }'
+
+      - name: Build multi-platform binaries
+        run: make build-all
+
+      - name: Upload binaries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-commerce-cli-binaries
+          path: dist/ai-commerce-cli-*
+          retention-days: 30
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-commerce-cli-coverage
+          path: cli/coverage.out
+          retention-days: 30

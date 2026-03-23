@@ -10,9 +10,7 @@
 # Documentos internos de planificación
 docs/plans/
 
-# Directorios vacíos / no implementados aún
-infra/docker/
-backend/
+# Directorios de soporte no versionados aún
 
 # Python
 __pycache__/
@@ -54,6 +52,8 @@ yarn-debug.log*
 # Logs
 *.log
 logs/
+bin/
+cli/cover.out
 
 # Tests
 .pytest_cache/

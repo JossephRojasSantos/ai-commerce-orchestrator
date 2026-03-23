@@ -58,8 +58,10 @@ lint:
 
 test:
 	@echo "🧪 Ejecutando tests..."
-	docker compose -f $(COMPOSE_FILE) run --rm backend \
-		sh -c "pip install pytest --quiet && pytest -v"
+	docker compose -f $(COMPOSE_FILE) run --rm \
+		-v "$(PWD)/backend/tests:/app/tests" \
+		backend \
+		sh -c "pip install pytest pytest-cov anyio trio httpx --quiet && pytest -v tests/ --cov=app --cov-report=term-missing"
 
 # ---- CLI (Go) --------------------------------------------------
 cli-build:

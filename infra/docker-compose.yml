@@ -23,7 +23,9 @@ services:
   # Backend inteligente (API)
   # ---------------------------
   backend:
-    image: python:3.11-slim
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.backend
     container_name: ai-backend
     restart: unless-stopped
     ports:
@@ -32,10 +34,8 @@ services:
       - ai-network
     env_file:
       - ../.env
-    working_dir: /app
-    command: ["python", "-m", "http.server", "8000"]   # placeholder
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000')\" 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

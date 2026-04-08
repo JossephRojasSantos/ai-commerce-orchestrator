@@ -99,6 +99,6 @@ jobs:
           context: .
           file: infra/docker/Dockerfile.backend
           push: false
-          tags: ai-backend:ci
+          tags: ai-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

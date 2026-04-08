@@ -1,6 +1,6 @@
 # AI-Commerce Orchestrator
 
-![CI](https://github.com/JossephRojasSantos/ai-commerce-orchestrator/actions/workflows/ci.yml/badge.svg?branch=main)
+![CI](https://github.com/JossephRojasSantos/ai-commerce-orchestrator/actions/workflows/ci.yml/badge.svg?branch=master)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

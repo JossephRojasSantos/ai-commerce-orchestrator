@@ -1,0 +1,72 @@
+# =============================================
+# AI-Commerce Orchestrator — .gitignore
+# =============================================
+
+# Secrets — NUNCA en git
+.env
+*.env
+!.env.example
+
+# Documentos internos de planificación
+docs/plans/
+
+# Directorios de soporte no versionados aún
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+*.egg
+
+# Node (por si se agrega frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# Docker
+.docker/
+
+# macOS
+.DS_Store
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+bin/
+cli/cover.out
+cli/coverage.out
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Test data
+docs/data/
+
+# Temporales
+tmp/
+temp/
+*.tmp
+*.bak

@@ -1,0 +1,48 @@
+{
+  "product": {
+    "id": 123,
+    "name": "Producto Test",
+    "slug": "producto-test",
+    "price": "99.99",
+    "stock_status": "instock",
+    "permalink": "https://tiendamagica.shop/producto-test",
+    "images": [{"id": 1, "src": "https://tiendamagica.shop/img.jpg", "alt": "img"}],
+    "categories": [{"id": 5, "name": "Magia", "slug": "magia"}]
+  },
+  "product_list": [
+    {
+      "id": 123,
+      "name": "Producto Test",
+      "slug": "producto-test",
+      "price": "99.99",
+      "stock_status": "instock",
+      "permalink": "https://tiendamagica.shop/producto-test",
+      "images": [],
+      "categories": []
+    }
+  ],
+  "order": {
+    "id": 456,
+    "status": "processing",
+    "total": "199.98",
+    "currency": "MXN",
+    "customer_id": 42,
+    "billing": {"first_name": "Juan", "last_name": "Perez", "email": "juan@example.com", "phone": "5551234567"},
+    "line_items": [{"id": 1, "name": "Producto Test", "quantity": 2, "total": "199.98", "product_id": 123}],
+    "date_created": "2026-04-07T10:00:00"
+  },
+  "order_list": [
+    {
+      "id": 456,
+      "status": "processing",
+      "total": "199.98",
+      "currency": "MXN",
+      "customer_id": 42,
+      "billing": {"first_name": "Juan", "last_name": "Perez", "email": "juan@example.com", "phone": "5551234567"},
+      "line_items": [],
+      "date_created": "2026-04-07T10:00:00"
+    }
+  ],
+  "error_404": {"code": "woocommerce_rest_product_invalid_id", "message": "Invalid ID.", "data": {"status": 404}},
+  "error_500": {"code": "internal_error", "message": "Server error", "data": {"status": 500}}
+}

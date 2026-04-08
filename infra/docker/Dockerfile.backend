@@ -1,0 +1,21 @@
+# ---- builder ----
+FROM python:3.11-slim AS builder
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY backend/pyproject.toml .
+RUN uv venv .venv && \
+    uv pip install --python .venv/bin/python -r pyproject.toml && \
+    uv pip install --python .venv/bin/python \
+        pytest pytest-asyncio pytest-cov respx fakeredis anyio[trio]
+
+# ---- final ----
+FROM python:3.11-slim AS final
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/.venv /app/.venv
+COPY backend/app ./app
+COPY backend/tests ./tests
+COPY backend/pyproject.toml .
+ENV PATH="/app/.venv/bin:$PATH"
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

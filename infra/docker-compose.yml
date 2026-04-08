@@ -1,0 +1,117 @@
+# =============================================================
+# AI-Commerce Orchestrator — docker-compose base (AI-33)
+# =============================================================
+# Servicios placeholder con healthchecks, redes y volúmenes.
+# Variables sensibles cargadas desde .env (nunca en git).
+# =============================================================
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  db-data:
+    name: ai-db-data
+  redis-data:
+    name: ai-redis-data
+  rabbitmq-data:
+    name: ai-rabbitmq-data
+
+services:
+
+  # ---------------------------
+  # Backend inteligente (API)
+  # ---------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.backend
+    container_name: ai-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - ai-network
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------
+  # Base de datos PostgreSQL
+  # ---------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: ai-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_commerce}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-ai_commerce}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------
+  # Cache / Cola — Redis
+  # ---------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    command: redis-server --appendonly yes
+
+  # ---------------------------
+  # Message Broker — RabbitMQ
+  # ---------------------------
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ai-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ai-network
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

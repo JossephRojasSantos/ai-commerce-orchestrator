@@ -63,7 +63,7 @@ async def handle_message(
         await redis.expire(rate_key, 60)
 
     if count > settings.CHAT_RATE_LIMIT_PER_MIN:
-        raise HTTPException(status_code=429, detail={"code": "rate_limit_exceeded"})
+        raise HTTPException(status_code=429, detail="rate_limit_exceeded")
 
     reply = f"[Stub AI-26] Recibí: {req.message}"
 

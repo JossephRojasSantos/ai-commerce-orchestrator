@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     WC_CACHE_TTL_PRODUCTS: int = 300
     WC_CACHE_TTL_ORDERS: int = 60
 
+    # Chat
+    CHAT_SESSION_TTL: int = 3600
+    CHAT_MAX_HISTORY: int = 50
+    CHAT_RATE_LIMIT_PER_MIN: int = 30
+    CHAT_ALLOWED_ORIGINS: list[str] = ["https://tiendamagica.shop", "http://localhost:3000"]
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

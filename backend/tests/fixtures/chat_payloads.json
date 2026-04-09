@@ -1,0 +1,17 @@
+{
+  "valid_request": {
+    "message": "Hola, ¿qué productos tienen?",
+    "session_id": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2026-04-08T12:00:00Z"
+  },
+  "empty_message": {
+    "message": "",
+    "session_id": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2026-04-08T12:00:00Z"
+  },
+  "long_message": {
+    "message": "A",
+    "session_id": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2026-04-08T12:00:00Z"
+  }
+}

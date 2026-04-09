@@ -16,6 +16,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY backend/app ./app
 COPY backend/tests ./tests
 COPY backend/pyproject.toml .
+COPY backend/alembic.ini .
+COPY backend/app/db/migrations ./app/db/migrations
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

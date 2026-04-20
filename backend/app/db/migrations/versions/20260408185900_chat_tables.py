@@ -31,7 +31,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("session_id"),
     )
-    op.create_index(op.f("ix_conversations_session_id"), "conversations", ["session_id"], unique=True)
+    op.create_index(
+        op.f("ix_conversations_session_id"), "conversations", ["session_id"], unique=True
+    )
 
     op.create_table(
         "messages",
@@ -44,7 +46,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_messages_conversation_id"), "messages", ["conversation_id"], unique=False)
+    op.create_index(
+        op.f("ix_messages_conversation_id"), "messages", ["conversation_id"], unique=False
+    )
 
 
 def downgrade() -> None:

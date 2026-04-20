@@ -20,9 +20,7 @@ async def get_or_create_conversation(
     user_ip: str | None = None,
     user_agent: str | None = None,
 ) -> Conversation:
-    result = await db.execute(
-        select(Conversation).where(Conversation.session_id == session_id)
-    )
+    result = await db.execute(select(Conversation).where(Conversation.session_id == session_id))
     conv = result.scalar_one_or_none()
     if conv is None:
         conv = Conversation(

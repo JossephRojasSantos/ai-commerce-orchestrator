@@ -1,4 +1,5 @@
 """Tests for chat DB persistence via handle_message and get_or_create_conversation."""
+
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import patch

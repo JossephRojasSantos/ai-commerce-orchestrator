@@ -1,13 +1,12 @@
 """Tests for POST /chat and GET /chat/history endpoints."""
+
 import json
 import uuid
 from pathlib import Path
 
 import pytest
 
-PAYLOADS = json.loads(
-    (Path(__file__).parent / "fixtures" / "chat_payloads.json").read_text()
-)
+PAYLOADS = json.loads((Path(__file__).parent / "fixtures" / "chat_payloads.json").read_text())
 
 SESSION_ID = "123e4567-e89b-12d3-a456-426614174000"
 

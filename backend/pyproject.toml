@@ -58,5 +58,9 @@ src = ["app", "tests"]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "ASYNC"]
 ignore = ["E501", "B008"]
 
+[tool.ruff.lint.per-file-ignores]
+"app/db/migrations/**" = ["I001"]
+"tests/test_chat_persistence.py" = ["I001"]
+
 [tool.ruff.format]
 quote-style = "double"

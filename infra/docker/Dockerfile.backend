@@ -6,7 +6,7 @@ COPY backend/pyproject.toml .
 RUN uv venv .venv && \
     uv pip install --python .venv/bin/python -r pyproject.toml && \
     uv pip install --python .venv/bin/python \
-        pytest pytest-asyncio pytest-cov respx fakeredis anyio[trio]
+        pytest pytest-asyncio pytest-cov respx fakeredis anyio[trio] aiosqlite
 
 # ---- final ----
 FROM python:3.11-slim AS final

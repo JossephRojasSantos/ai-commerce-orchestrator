@@ -25,6 +25,7 @@ dev = [
     "anyio[trio]>=4.7",
     "respx>=0.21",
     "fakeredis>=2.26",
+    "aiosqlite>=0.20",
     "ruff>=0.4",
 ]
 

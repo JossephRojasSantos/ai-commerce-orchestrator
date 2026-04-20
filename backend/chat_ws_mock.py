@@ -103,8 +103,8 @@ async def demo_alerts():
 
 
 async def main():
-    async with websockets.serve(handler, "localhost", 8080):
-        log.info("Mock WS server en ws://localhost:8080 — Ctrl+C para detener")
+    async with websockets.serve(handler, "localhost", 8765):
+        log.info("Mock WS server en ws://localhost:8765 — Ctrl+C para detener")
         await asyncio.gather(demo_alerts())
 
 

@@ -13,6 +13,8 @@ dependencies = [
     "httpx>=0.28",
     "tenacity>=8.2",
     "orjson>=3.9",
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +25,7 @@ dev = [
     "anyio[trio]>=4.7",
     "respx>=0.21",
     "fakeredis>=2.26",
+    "aiosqlite>=0.20",
     "ruff>=0.4",
 ]
 
@@ -53,7 +56,11 @@ src = ["app", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "ASYNC"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/db/migrations/**" = ["I001"]
+"tests/test_chat_persistence.py" = ["I001"]
 
 [tool.ruff.format]
 quote-style = "double"

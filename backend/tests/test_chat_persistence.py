@@ -1,15 +1,15 @@
 """Tests for chat DB persistence via handle_message and get_or_create_conversation."""
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import fakeredis.aioredis
 import pytest
 from sqlalchemy import select
 
+from app.models.conversation import Conversation, Message
 from app.schemas.chat import ChatRequest
 from app.services.chat import get_or_create_conversation, handle_message
-from app.models.conversation import Conversation, Message
 
 
 SESSION_ID = uuid.UUID("123e4567-e89b-12d3-a456-426614174001")
@@ -19,7 +19,7 @@ def _make_request(msg: str = "Hola") -> ChatRequest:
     return ChatRequest(
         message=msg,
         session_id=SESSION_ID,
-        timestamp=datetime(2026, 4, 8, 12, 0, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 4, 8, 12, 0, 0, tzinfo=UTC),
     )
 
 

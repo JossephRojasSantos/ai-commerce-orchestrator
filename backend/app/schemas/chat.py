@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
+
 from pydantic import BaseModel, Field
-import uuid as _uuid  # noqa: F401
 
 
 class ChatMessage(BaseModel):

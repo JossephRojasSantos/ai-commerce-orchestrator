@@ -1,10 +1,13 @@
 """Integration tests: full graph flows with MemorySaver (no real Redis/LLM)."""
+import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.services.orchestrator.graph import build_graph, process_message
+from app.services.orchestrator.graph import build_graph, get_graph, process_message
+from app.services.orchestrator.state import ConversationState
 
 
 def _get_test_graph():
@@ -144,3 +147,71 @@ async def test_process_message_function():
     assert result["reply"] == "Hola!"
     assert result["session_id"] == "web:userX"
     assert result["trace_id"] == "trace-x"
+
+
+def test_get_graph_returns_cached_instance():
+    """Covers graph.py lines 72-74: get_graph() builds once, returns same object."""
+    import app.services.orchestrator.graph as graph_mod
+
+    with patch("app.services.orchestrator.graph.get_checkpointer", return_value=MemorySaver()):
+        graph_mod._graph = None  # reset
+        g1 = get_graph()
+        g2 = get_graph()  # second call uses cached _graph
+    assert g1 is g2
+    graph_mod._graph = None  # cleanup
+
+
+async def test_agent_exception_triggers_fallback():
+    """Covers graph.py lines 39-42: exception inside agent node → fallback."""
+    graph = _get_test_graph()
+
+    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"buy","confidence":0.9}'):
+        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+            with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
+                with patch("app.services.orchestrator.agents.chat.run", side_effect=Exception("agent crashed")):
+                    config = {"configurable": {"thread_id": "web:test_exc"}}
+                    state = ConversationState(
+                        messages=[HumanMessage(content="quiero comprar algo")],
+                        intent="",
+                        confidence=0.0,
+                        session_id="web:test_exc",
+                        trace_id="t_exc",
+                        channel="web",
+                        user_id="test_exc",
+                        agent="",
+                        metadata={},
+                    )
+                    result = await graph.ainvoke(state, config=config)
+
+    assert result["agent"] == "fallback"
+
+
+async def test_agent_degraded_triggers_fallback():
+    """Covers graph.py lines 29-30: is_agent_degraded True → fallback skips agent."""
+    import app.core.errors as errors_mod
+
+    graph = _get_test_graph()
+
+    # Mark "chat" agent as degraded
+    errors_mod._degraded_until["chat"] = time.monotonic() + 60.0
+    try:
+        with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"buy","confidence":0.9}'):
+            with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+                with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
+                    config = {"configurable": {"thread_id": "web:test_deg"}}
+                    state = ConversationState(
+                        messages=[HumanMessage(content="quiero comprar algo")],
+                        intent="",
+                        confidence=0.0,
+                        session_id="web:test_deg",
+                        trace_id="t_deg",
+                        channel="web",
+                        user_id="test_deg",
+                        agent="",
+                        metadata={},
+                    )
+                    result = await graph.ainvoke(state, config=config)
+    finally:
+        errors_mod._degraded_until.pop("chat", None)
+
+    assert result["agent"] == "fallback"

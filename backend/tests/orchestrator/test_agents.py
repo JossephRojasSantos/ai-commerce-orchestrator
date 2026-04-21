@@ -5,6 +5,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.services.orchestrator.agents import chat, fallback, recommendation, tracking
+from app.services.orchestrator.agents.base import AgentProtocol  # noqa: F401 — ensures base.py coverage
 from app.services.orchestrator.state import ConversationState
 
 
@@ -82,3 +83,26 @@ async def test_tracking_wc_error():
     with patch("app.services.orchestrator.agents.tracking.get_wc_client", new_callable=AsyncMock, return_value=mock_wc):
         result = await tracking.run(state)
     assert "99999" in result["messages"][0].content
+
+
+async def test_chat_agent_multi_turn_history():
+    """Covers chat.py lines 19-22: HumanMessage + AIMessage in history loop."""
+    state = ConversationState(
+        messages=[
+            HumanMessage(content="busco zapatos rojos"),
+            AIMessage(content="Tenemos varios modelos, ¿qué talla?"),
+            HumanMessage(content="talla 42"),
+        ],
+        intent="buy",
+        confidence=0.9,
+        session_id="web:u1",
+        trace_id="t1",
+        channel="web",
+        user_id="u1",
+        agent="",
+        metadata={},
+    )
+    with patch("app.services.orchestrator.agents.chat.chat_complete", new_callable=AsyncMock, return_value="Aquí tienes opciones en talla 42."):
+        result = await chat.run(state)
+    assert result["agent"] == "chat"
+    assert "42" in result["messages"][0].content

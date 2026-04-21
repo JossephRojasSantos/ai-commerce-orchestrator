@@ -73,6 +73,17 @@ async def test_classify_intent_llm_invalid_json():
     assert result.intent == Intent.OTHER
 
 
+async def test_classify_intent_llm_code_block_response():
+    """Covers router.py line 68: strip ```json ... ``` wrapper from LLM response."""
+    llm_response = "```json\n{\"intent\": \"recommend\", \"confidence\": 0.88}\n```"
+    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value=llm_response):
+        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+            with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
+                result = await classify_intent("qué me recomiendas", "web:user5")
+    assert result.intent == Intent.RECOMMEND
+    assert result.confidence == 0.88
+
+
 def test_fixtures_coverage():
     fixtures_path = Path(__file__).parent / "fixtures" / "conversations.json"
     data = json.loads(fixtures_path.read_text())

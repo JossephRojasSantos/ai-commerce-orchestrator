@@ -8,10 +8,13 @@ from starlette.responses import Response
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        request.state.request_id = request_id
+        trace_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        request.state.request_id = trace_id
+        request.state.trace_id = trace_id
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
         response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Request-ID"] = trace_id
         return response
 
 

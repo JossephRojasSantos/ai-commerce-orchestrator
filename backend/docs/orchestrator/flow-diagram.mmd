@@ -1,0 +1,20 @@
+graph TD
+    A[Chat Web / WhatsApp] -->|POST /v1/orchestrator/message| B[AgentRouter]
+    B -->|classify_intent LLM + regex| C{Intent}
+    C -->|buy| D[ChatAgent]
+    C -->|track| E[TrackingAgent]
+    C -->|recommend| F[RecoAgent]
+    C -->|other| G[FallbackAgent]
+
+    D -->|LLM multi-turn| H[Reply]
+    E -->|WC API orders/id| H
+    F -->|RAG stub AI-29| H
+    G -->|generic message| H
+
+    H -->|state persisted| I[(Redis Checkpointer)]
+    I -.->|restore on next message| B
+
+    style D fill:#4ade80,color:#000
+    style E fill:#60a5fa,color:#000
+    style F fill:#f472b6,color:#000
+    style G fill:#fb923c,color:#000

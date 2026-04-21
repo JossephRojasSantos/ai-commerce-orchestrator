@@ -1,0 +1,14 @@
+[
+  {"text": "quiero comprar unos zapatos rojos", "expected": "buy"},
+  {"text": "¿cuánto cuesta el vestido azul?", "expected": "buy"},
+  {"text": "necesito un regalo para mi mamá", "expected": "buy"},
+  {"text": "agregar al carrito la blusa talla M", "expected": "buy"},
+  {"text": "dónde está mi pedido", "expected": "track"},
+  {"text": "pedido 12345 cuándo llega", "expected": "track"},
+  {"text": "order #999 status", "expected": "track"},
+  {"text": "tracking de mi envío", "expected": "track"},
+  {"text": "qué me recomiendas para el verano", "expected": "recommend"},
+  {"text": "sugiéreme algo similar a lo que compré", "expected": "recommend"},
+  {"text": "hola", "expected": "other"},
+  {"text": "buenos días", "expected": "other"}
+]

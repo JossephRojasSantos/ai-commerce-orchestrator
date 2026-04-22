@@ -1,9 +1,23 @@
+import time
 import uuid
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+
+try:
+    from app.core.metrics import (
+        http_errors_total,
+        http_request_duration_seconds,
+        http_requests_total,
+    )
+
+    _METRICS_AVAILABLE = True
+except ImportError:
+    _METRICS_AVAILABLE = False
+
+log = structlog.get_logger()
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -13,7 +27,33 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         request.state.trace_id = trace_id
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(trace_id=trace_id)
+
+        t0 = time.perf_counter()
         response = await call_next(request)
+        duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        status = response.status_code
+        method = request.method
+        path = request.url.path
+
+        log.info(
+            "request",
+            method=method,
+            path=path,
+            status=status,
+            duration_ms=duration_ms,
+            trace_id=trace_id,
+        )
+
+        if _METRICS_AVAILABLE:
+            try:
+                http_requests_total.labels(method=method, path=path, status=str(status)).inc()
+                http_request_duration_seconds.labels(method=method, path=path).observe(duration_ms / 1000)
+                if status >= 400:
+                    http_errors_total.labels(method=method, path=path, status=str(status)).inc()
+            except Exception:
+                pass
+
         response.headers["X-Request-ID"] = trace_id
         return response
 

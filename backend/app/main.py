@@ -41,6 +41,11 @@ def create_app() -> FastAPI:
 
     app.include_router(chat_router)
 
+    if settings.METRICS_ENABLED:
+        from app.routers.metrics import router as metrics_router
+
+        app.include_router(metrics_router)
+
     from app.routers.orchestrator import router as orchestrator_router
 
     app.include_router(orchestrator_router)

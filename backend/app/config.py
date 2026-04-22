@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379/0"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "json"
+    METRICS_ENABLED: bool = True
 
     # WooCommerce
     WC_BASE_URL: str = "https://tiendamagica.shop/wp-json/wc/v3"

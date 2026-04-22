@@ -4,6 +4,16 @@ import fakeredis.aioredis
 import pytest
 from app.main import app
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _mock_middleware_redis():
+    """Prevent IPRateLimitMiddleware from hitting real Redis in tests."""
+    mock_r = AsyncMock()
+    mock_r.incr = AsyncMock(return_value=1)
+    mock_r.expire = AsyncMock()
+    with patch("app.middleware.get_redis", return_value=mock_r):
+        yield mock_r
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

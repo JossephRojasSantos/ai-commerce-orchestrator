@@ -4,7 +4,10 @@ import uuid
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+
+from app.config import settings
+from app.core.cache import get_redis
 
 try:
     from app.core.metrics import (
@@ -18,6 +21,31 @@ except ImportError:
     _METRICS_AVAILABLE = False
 
 log = structlog.get_logger()
+
+_RATE_LIMIT_SKIP = ("/health", "/metrics", "/api/whatsapp/webhook")
+
+
+class IPRateLimitMiddleware(BaseHTTPMiddleware):
+    """Block IPs exceeding IP_RATE_LIMIT_PER_MIN requests per minute."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if request.url.path.startswith(_RATE_LIMIT_SKIP):
+            return await call_next(request)
+
+        ip = request.client.host if request.client else "unknown"
+        try:
+            redis = get_redis()
+            key = f"ratelimit:ip:{ip}"
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, 60)
+            if count > settings.IP_RATE_LIMIT_PER_MIN:
+                log.warning("ip.rate_limited", ip=ip, count=count)
+                return JSONResponse(status_code=429, content={"detail": "rate_limit_exceeded"})
+        except Exception:
+            log.warning("ip.ratelimit.redis_unavailable", ip=ip)
+
+        return await call_next(request)
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):

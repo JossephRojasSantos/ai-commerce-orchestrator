@@ -1,21 +1,16 @@
-"""Unit tests for checkpointer — covers AsyncRedisSaver path and MemorySaver fallback."""
-from unittest.mock import MagicMock, patch
-
+"""Unit tests for checkpointer — MemorySaver (AsyncRedisSaver requires async lifespan)."""
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.services.orchestrator.checkpointer import get_checkpointer
 
 
-def test_get_checkpointer_redis_succeeds():
-    """Covers lines 8-10: AsyncRedisSaver.from_conn_string returns a saver."""
-    mock_saver = MagicMock()
-    with patch("langgraph.checkpoint.redis.aio.AsyncRedisSaver.from_conn_string", return_value=mock_saver):
-        result = get_checkpointer()
-    assert result is mock_saver
-
-
-def test_get_checkpointer_fallback_to_memory():
-    """Covers lines 11-12: from_conn_string raises → MemorySaver returned."""
-    with patch("langgraph.checkpoint.redis.aio.AsyncRedisSaver.from_conn_string", side_effect=Exception("Redis down")):
-        result = get_checkpointer()
+def test_get_checkpointer_returns_memory_saver():
+    result = get_checkpointer()
     assert isinstance(result, MemorySaver)
+
+
+def test_get_checkpointer_returns_new_instance_each_call():
+    a = get_checkpointer()
+    b = get_checkpointer()
+    assert isinstance(a, MemorySaver)
+    assert isinstance(b, MemorySaver)

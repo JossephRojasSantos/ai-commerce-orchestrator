@@ -61,6 +61,8 @@ async def classify_intent(text: str, session_id: str) -> RouterResult:
     try:
         raw = await chat_complete(
             [{"role": "user", "content": _CLASSIFIER_PROMPT.format(text=text)}],
+            model=settings.LLM_MODEL_ROUTER,
+            fallback=settings.LLM_FALLBACK_ROUTER,
             temperature=0.0,
         )
         raw = raw.strip()

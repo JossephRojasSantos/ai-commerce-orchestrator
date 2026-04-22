@@ -37,14 +37,25 @@ class Settings(BaseSettings):
 
     # LLM
     LLM_API_KEY: str = ""
-    LLM_API_BASE: str = "https://api.openai.com/v1"
-    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_API_BASE: str = "https://openrouter.ai/api/v1"
+    LLM_MODEL_CHAT: str = "openai/gpt-4o-mini"
+    LLM_MODEL_ROUTER: str = "google/gemini-2.0-flash"
+    LLM_MODEL_WHATSAPP: str = "openai/gpt-4o-mini"
+    LLM_FALLBACK_CHAT: str = "anthropic/claude-haiku-4-5"
+    LLM_FALLBACK_ROUTER: str = "meta-llama/llama-3.1-8b-instruct"
     LLM_TIMEOUT: float = 30.0
+    OPENROUTER_REFERER: str = "https://tiendamagica.shop"
+    OPENROUTER_APP_NAME: str = "Tienda Magica"
 
     # Orchestrator
     ORCHESTRATOR_AGENT_TIMEOUT: float = 15.0
     ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD: int = 3
+    ORCHESTRATOR_RATE_LIMIT_PER_MIN: int = 20
     INTENT_CACHE_TTL: int = 3600
+
+    # Auth & rate limiting
+    ALLOWED_API_KEYS: list[str] = []
+    IP_RATE_LIMIT_PER_MIN: int = 60
 
     @property
     def WA_API_BASE(self) -> str:

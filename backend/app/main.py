@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.middleware import RequestIDMiddleware, setup_logging
+from app.middleware import IPRateLimitMiddleware, RequestIDMiddleware, setup_logging
 from app.routers.health import router as health_router
 from app.schemas.errors import ErrorResponse
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(IPRateLimitMiddleware)
 
     app.include_router(health_router)
 
@@ -40,6 +41,17 @@ def create_app() -> FastAPI:
     from app.routers.chat import router as chat_router
 
     app.include_router(chat_router)
+
+    if settings.METRICS_ENABLED:
+        from app.routers.metrics import router as metrics_router
+
+        app.include_router(metrics_router)
+
+    from app.routers.orchestrator import router as orchestrator_router
+    from app.routers.whatsapp import router as whatsapp_router
+
+    app.include_router(orchestrator_router)
+    app.include_router(whatsapp_router)
 
     register_exception_handlers(app)
     return app

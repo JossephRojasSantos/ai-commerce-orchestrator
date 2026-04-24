@@ -43,6 +43,51 @@ async def _make_sqlite_engine():
     return engine
 
 
+@pytest.fixture(autouse=True)
+def _mock_middleware_redis():
+    """Prevent IPRateLimitMiddleware from hitting real Redis in tests."""
+    mock_r = AsyncMock()
+    mock_r.incr = AsyncMock(return_value=1)
+    mock_r.expire = AsyncMock()
+    with patch("app.middleware.get_redis", return_value=mock_r):
+        yield mock_r
+
+
+# Raw DDL for SQLite — mirrors conversation.py models without PG-specific types
+_CREATE_TABLES_SQL = """
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    session_id TEXT UNIQUE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    user_ip TEXT,
+    user_agent TEXT
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    metadata TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_conversations_session_id ON conversations(session_id);
+CREATE INDEX IF NOT EXISTS ix_messages_conversation_id ON messages(conversation_id);
+"""
+
+
+async def _make_sqlite_engine():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    async with engine.begin() as conn:
+        for stmt in _CREATE_TABLES_SQL.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                await conn.execute(text(stmt))
+    return engine
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

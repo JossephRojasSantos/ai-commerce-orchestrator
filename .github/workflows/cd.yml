@@ -1,0 +1,61 @@
+name: CD
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/ai-commerce-backend
+
+jobs:
+  deploy:
+    name: Build → Push → Deploy → Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/docker/Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            IMAGE_TAG=${{ github.sha }} docker compose -f infra/docker-compose.yml up -d backend
+            docker image prune -f
+
+      - name: Smoke test post-deploy
+        run: |
+          sleep 15
+          BACKEND_URL="${{ secrets.BACKEND_URL }}" bash scripts/smoke-test.sh
+        env:
+          DB_HOST: ${{ secrets.DEPLOY_HOST }}

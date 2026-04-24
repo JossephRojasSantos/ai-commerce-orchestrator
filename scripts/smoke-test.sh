@@ -25,6 +25,7 @@ DB_NAME="${DB_NAME:-ai_commerce}"
 RABBITMQ_MGMT_PORT="${RABBITMQ_MGMT_PORT:-15672}"
 RABBITMQ_USER="${RABBITMQ_USER:-guest}"
 RABBITMQ_PASS="${RABBITMQ_PASS:-guest}"
+BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 
 PASS=0
 FAIL=0
@@ -61,6 +62,17 @@ echo ""
 echo "▶ Message Broker (RabbitMQ)"
 check "Management API responde en puerto ${RABBITMQ_MGMT_PORT}" \
   "curl -sf -u ${RABBITMQ_USER}:${RABBITMQ_PASS} http://localhost:${RABBITMQ_MGMT_PORT}/api/healthchecks/node | grep -q '\"status\":\"ok\"'"
+
+echo ""
+echo "▶ Backend API"
+check "GET /health → 200" \
+  "curl -sf ${BACKEND_URL}/health | grep -q 'status'"
+
+check "GET /metrics → Prometheus format" \
+  "curl -sf ${BACKEND_URL}/metrics | grep -q 'http_requests_total'"
+
+check "GET /products → 200" \
+  "curl -sf '${BACKEND_URL}/products?per_page=1'"
 
 echo ""
 echo "================================================="

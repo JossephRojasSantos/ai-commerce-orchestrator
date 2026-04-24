@@ -33,7 +33,7 @@ def _make_agent_node(agent_module, name: str):
         try:
             output = await run_with_timeout(
                 agent_module.run(state),
-                timeout=settings.ORCHESTRATOR_AGENT_TIMEOUT,
+                deadline=settings.ORCHESTRATOR_AGENT_TIMEOUT,
                 agent_name=name,
             )
             record_agent_success(name)

@@ -4,8 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from app.services.orchestrator.router import Intent, RouterResult, _regex_fallback, classify_intent
+from app.services.orchestrator.router import Intent, _regex_fallback, classify_intent
 
 
 @pytest.mark.parametrize(

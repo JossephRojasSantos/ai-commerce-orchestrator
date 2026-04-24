@@ -2,9 +2,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.main import app
+from httpx import ASGITransport, AsyncClient
 
 _API_KEY = "key-web-test"
 _AUTH = {"Authorization": f"Bearer {_API_KEY}"}
@@ -107,14 +106,13 @@ async def test_orchestrate_message_rate_limited():
 @pytest.mark.asyncio
 async def test_orchestrate_message_ip_rate_limited(_mock_middleware_redis):
     _mock_middleware_redis.incr = AsyncMock(return_value=9999)
-    with _patch_auth():
-        with patch("app.middleware.settings", MagicMock(IP_RATE_LIMIT_PER_MIN=10)):
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                resp = await client.post(
-                    "/v1/orchestrator/message",
-                    json={"channel": "web", "user_id": "user1", "text": "spam"},
-                    headers=_AUTH,
-                )
+    with _patch_auth(), patch("app.middleware.settings", MagicMock(IP_RATE_LIMIT_PER_MIN=10)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                "/v1/orchestrator/message",
+                json={"channel": "web", "user_id": "user1", "text": "spam"},
+                headers=_AUTH,
+            )
     assert resp.status_code == 429
 
 

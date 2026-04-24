@@ -5,9 +5,8 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.main import app
+from httpx import ASGITransport, AsyncClient
 
 _SECRET = "test_app_secret"
 _VERIFY_TOKEN = "test_verify_token"
@@ -95,13 +94,12 @@ async def test_webhook_receive_valid_empty_payload(wa_client):
     mock_redis.set = AsyncMock(return_value=True)
     mock_redis.rpush = AsyncMock()
 
-    with _patch_settings():
-        with patch("app.core.cache.get_redis", return_value=mock_redis):
-            resp = await wa_client.post(
-                "/api/whatsapp/webhook",
-                content=body,
-                headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
-            )
+    with _patch_settings(), patch("app.core.cache.get_redis", return_value=mock_redis):
+        resp = await wa_client.post(
+            "/api/whatsapp/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        )
     assert resp.status_code == 200
     assert resp.json() == {"status": "received"}
 
@@ -132,13 +130,12 @@ async def test_webhook_receive_enqueues_message(wa_client):
     mock_redis.set = AsyncMock(return_value=True)
     mock_redis.rpush = AsyncMock()
 
-    with _patch_settings():
-        with patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
-            resp = await wa_client.post(
-                "/api/whatsapp/webhook",
-                content=body,
-                headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
-            )
+    with _patch_settings(), patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
+        resp = await wa_client.post(
+            "/api/whatsapp/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        )
     assert resp.status_code == 200
     mock_redis.rpush.assert_called_once()
 
@@ -167,13 +164,12 @@ async def test_webhook_receive_duplicate_message_skipped(wa_client):
     mock_redis.set = AsyncMock(return_value=None)
     mock_redis.rpush = AsyncMock()
 
-    with _patch_settings():
-        with patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
-            resp = await wa_client.post(
-                "/api/whatsapp/webhook",
-                content=body,
-                headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
-            )
+    with _patch_settings(), patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
+        resp = await wa_client.post(
+            "/api/whatsapp/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        )
     assert resp.status_code == 200
     mock_redis.rpush.assert_not_called()
 
@@ -194,12 +190,11 @@ async def test_webhook_receive_non_messages_field_ignored(wa_client):
 
     mock_redis = AsyncMock()
 
-    with _patch_settings():
-        with patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
-            resp = await wa_client.post(
-                "/api/whatsapp/webhook",
-                content=body,
-                headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
-            )
+    with _patch_settings(), patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
+        resp = await wa_client.post(
+            "/api/whatsapp/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        )
     assert resp.status_code == 200
     mock_redis.rpush.assert_not_called()

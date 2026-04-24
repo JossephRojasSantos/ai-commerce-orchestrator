@@ -1,12 +1,15 @@
 """Coverage for app/core/errors.py — circuit breaker logic."""
 import asyncio
 import time
-from unittest.mock import patch
 
 import pytest
-
 from app.core import errors as err_module
-from app.core.errors import is_agent_degraded, record_agent_failure, record_agent_success, run_with_timeout
+from app.core.errors import (
+    is_agent_degraded,
+    record_agent_failure,
+    record_agent_success,
+    run_with_timeout,
+)
 
 
 @pytest.fixture(autouse=True)

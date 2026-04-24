@@ -1,12 +1,15 @@
-import asyncio
 
 import structlog
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 
 from app.config import settings
-from app.core.errors import is_agent_degraded, record_agent_failure, record_agent_success, run_with_timeout
-from app.services.orchestrator import agents
+from app.core.errors import (
+    is_agent_degraded,
+    record_agent_failure,
+    record_agent_success,
+    run_with_timeout,
+)
 from app.services.orchestrator.agents import chat, fallback, recommendation, tracking
 from app.services.orchestrator.checkpointer import get_checkpointer
 from app.services.orchestrator.handoff import route_intent
@@ -36,7 +39,7 @@ def _make_agent_node(agent_module, name: str):
             )
             record_agent_success(name)
             return output
-        except (TimeoutError, asyncio.TimeoutError, Exception) as exc:
+        except (TimeoutError, Exception) as exc:
             degraded = record_agent_failure(name, settings.ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD)
             logger.error("agent_error", agent=name, error=str(exc), degraded=degraded)
             return await fallback.run(state)

@@ -1,7 +1,6 @@
 """Unit tests for checkpointer — MemorySaver (AsyncRedisSaver requires async lifespan)."""
-from langgraph.checkpoint.memory import MemorySaver
-
 from app.services.orchestrator.checkpointer import get_checkpointer
+from langgraph.checkpoint.memory import MemorySaver
 
 
 def test_get_checkpointer_returns_memory_saver():

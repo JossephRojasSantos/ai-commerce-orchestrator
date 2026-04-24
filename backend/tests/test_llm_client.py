@@ -1,9 +1,8 @@
 """Unit tests for app/clients/llm.py — verifies OpenRouter headers and fallback payload."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import httpx
-
+import pytest
 from app.clients.llm import chat_complete
 
 

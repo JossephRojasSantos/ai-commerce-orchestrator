@@ -2,12 +2,10 @@
 import time
 from unittest.mock import AsyncMock, patch
 
-import pytest
-from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.memory import MemorySaver
-
 from app.services.orchestrator.graph import build_graph, get_graph, process_message
 from app.services.orchestrator.state import ConversationState
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
 
 
 def _get_test_graph():
@@ -23,8 +21,8 @@ async def test_buy_flow_e2e():
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                 with patch("app.services.orchestrator.agents.chat.chat_complete", new_callable=AsyncMock, return_value="Aquí tienes opciones de zapatos."):
                     config = {"configurable": {"thread_id": "web:test1"}}
-                    from langchain_core.messages import HumanMessage
                     from app.services.orchestrator.state import ConversationState
+                    from langchain_core.messages import HumanMessage
 
                     state = ConversationState(
                         messages=[HumanMessage(content="quiero comprar zapatos")],
@@ -53,8 +51,8 @@ async def test_track_flow_e2e():
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                 with patch("app.services.orchestrator.agents.tracking.get_wc_client", new_callable=AsyncMock, return_value=mock_wc):
                     config = {"configurable": {"thread_id": "web:test2"}}
-                    from langchain_core.messages import HumanMessage
                     from app.services.orchestrator.state import ConversationState
+                    from langchain_core.messages import HumanMessage
 
                     state = ConversationState(
                         messages=[HumanMessage(content="pedido 12345 dónde está")],
@@ -78,8 +76,8 @@ async def test_fallback_flow_e2e():
         with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                 config = {"configurable": {"thread_id": "web:test3"}}
-                from langchain_core.messages import HumanMessage
                 from app.services.orchestrator.state import ConversationState
+                from langchain_core.messages import HumanMessage
 
                 state = ConversationState(
                     messages=[HumanMessage(content="hola")],
@@ -100,8 +98,8 @@ async def test_state_persisted_between_messages():
     """Two consecutive messages on same thread share state."""
     graph = _get_test_graph()
     config = {"configurable": {"thread_id": "web:test4"}}
-    from langchain_core.messages import HumanMessage
     from app.services.orchestrator.state import ConversationState
+    from langchain_core.messages import HumanMessage
 
     base_state = dict(
         intent="",

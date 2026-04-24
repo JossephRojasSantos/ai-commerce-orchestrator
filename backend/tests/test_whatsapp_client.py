@@ -2,8 +2,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from app.integrations.whatsapp.client import send_template_message, send_text_message, send_whatsapp_message
+from app.integrations.whatsapp.client import (
+    send_template_message,
+    send_text_message,
+)
 
 
 def _mock_resp(status: int, body: dict | None = None):

@@ -51,9 +51,6 @@ def _mock_middleware_redis():
     mock_r.expire = AsyncMock()
     with patch("app.middleware.get_redis", return_value=mock_r):
         yield mock_r
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Raw DDL for SQLite — mirrors conversation.py models without PG-specific types
 _CREATE_TABLES_SQL = """

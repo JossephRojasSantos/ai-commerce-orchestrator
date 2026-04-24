@@ -1,12 +1,12 @@
 """Unit tests for individual agents — all external deps mocked."""
 from unittest.mock import AsyncMock, patch
 
-import pytest
-from langchain_core.messages import AIMessage, HumanMessage
-
 from app.services.orchestrator.agents import chat, fallback, recommendation, tracking
-from app.services.orchestrator.agents.base import AgentProtocol  # noqa: F401 — ensures base.py coverage
+from app.services.orchestrator.agents.base import (
+    AgentProtocol,  # noqa: F401 — ensures base.py coverage
+)
 from app.services.orchestrator.state import ConversationState
+from langchain_core.messages import AIMessage, HumanMessage
 
 
 def _make_state(text: str, intent: str = "other", **kwargs) -> ConversationState:

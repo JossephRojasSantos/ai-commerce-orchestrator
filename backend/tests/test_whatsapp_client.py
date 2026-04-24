@@ -1,4 +1,5 @@
 """Coverage for app/integrations/whatsapp/client.py"""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,7 +28,9 @@ def _make_client_ctx(resp):
 @pytest.mark.asyncio
 async def test_send_text_message_success():
     resp = _mock_resp(200, {"messages": [{"id": "msg-001"}]})
-    with patch("app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)):
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
         result = await send_text_message("521234567890", "Hola!")
     assert result.status == "sent"
     assert result.message_id == "msg-001"
@@ -36,7 +39,9 @@ async def test_send_text_message_success():
 @pytest.mark.asyncio
 async def test_send_template_message_success():
     resp = _mock_resp(200, {"messages": [{"id": "msg-002"}]})
-    with patch("app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)):
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
         result = await send_template_message("521234567890", "order_confirm", {"name": "Juan"})
     assert result.status == "sent"
     assert result.message_id == "msg-002"
@@ -45,7 +50,9 @@ async def test_send_template_message_success():
 @pytest.mark.asyncio
 async def test_send_text_message_non_retryable_error():
     resp = _mock_resp(400, {"error": "bad request"})
-    with patch("app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)):
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
         result = await send_text_message("521234567890", "test")
     assert result.status == "failed"
     assert "400" in result.error

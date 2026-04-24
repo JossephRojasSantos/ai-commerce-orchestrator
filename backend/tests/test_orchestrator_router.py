@@ -1,4 +1,5 @@
 """Coverage for app/routers/orchestrator.py"""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -31,11 +32,21 @@ async def test_orchestrate_message_ok():
     }
     with _patch_auth():
         with patch("app.routers.orchestrator.get_redis", return_value=_mock_redis(1)):
-            with patch("app.routers.orchestrator.process_message", new_callable=AsyncMock, return_value=mock_result):
-                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            with patch(
+                "app.routers.orchestrator.process_message",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ):
+                async with AsyncClient(
+                    transport=ASGITransport(app=app), base_url="http://test"
+                ) as client:
                     resp = await client.post(
                         "/v1/orchestrator/message",
-                        json={"channel": "web", "user_id": "user1", "text": "quiero comprar zapatos"},
+                        json={
+                            "channel": "web",
+                            "user_id": "user1",
+                            "text": "quiero comprar zapatos",
+                        },
                         headers=_AUTH,
                     )
     assert resp.status_code == 200
@@ -78,8 +89,14 @@ async def test_orchestrate_message_whatsapp_channel():
     }
     with _patch_auth():
         with patch("app.routers.orchestrator.get_redis", return_value=_mock_redis(1)):
-            with patch("app.routers.orchestrator.process_message", new_callable=AsyncMock, return_value=mock_result):
-                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            with patch(
+                "app.routers.orchestrator.process_message",
+                new_callable=AsyncMock,
+                return_value=mock_result,
+            ):
+                async with AsyncClient(
+                    transport=ASGITransport(app=app), base_url="http://test"
+                ) as client:
                     resp = await client.post(
                         "/v1/orchestrator/message",
                         json={"channel": "whatsapp", "user_id": "5200", "text": "hola"},
@@ -92,9 +109,15 @@ async def test_orchestrate_message_whatsapp_channel():
 @pytest.mark.asyncio
 async def test_orchestrate_message_rate_limited():
     from app.config import settings
+
     with _patch_auth():
-        with patch("app.routers.orchestrator.get_redis", return_value=_mock_redis(settings.ORCHESTRATOR_RATE_LIMIT_PER_MIN + 1)):
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        with patch(
+            "app.routers.orchestrator.get_redis",
+            return_value=_mock_redis(settings.ORCHESTRATOR_RATE_LIMIT_PER_MIN + 1),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
                 resp = await client.post(
                     "/v1/orchestrator/message",
                     json={"channel": "web", "user_id": "abuser", "text": "spam"},

@@ -1,4 +1,5 @@
 """Coverage for app/core/errors.py — circuit breaker logic."""
+
 import asyncio
 import time
 

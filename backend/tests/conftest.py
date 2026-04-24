@@ -52,6 +52,7 @@ def _mock_middleware_redis():
     with patch("app.middleware.get_redis", return_value=mock_r):
         yield mock_r
 
+
 # Raw DDL for SQLite — mirrors conversation.py models without PG-specific types
 _CREATE_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS conversations (

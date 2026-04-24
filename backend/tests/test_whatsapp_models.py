@@ -1,4 +1,5 @@
 """Coverage for app/integrations/whatsapp/models.py"""
+
 from app.integrations.whatsapp.models import (
     WAIncomingMessage,
     WASendResult,
@@ -16,7 +17,9 @@ def test_wa_text_message():
 
 
 def test_wa_incoming_message_text():
-    msg = WAIncomingMessage(id="id1", from_="521234567890", type="text", text=WATextMessage(body="test"))
+    msg = WAIncomingMessage(
+        id="id1", from_="521234567890", type="text", text=WATextMessage(body="test")
+    )
     assert msg.from_ == "521234567890"
     assert msg.type == "text"
     assert msg.text.body == "test"

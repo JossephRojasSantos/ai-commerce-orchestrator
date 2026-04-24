@@ -1,4 +1,5 @@
 """Unit tests for app/clients/llm.py — verifies OpenRouter headers and fallback payload."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -99,6 +100,7 @@ async def test_chat_complete_defaults_to_llm_model_chat():
         mock_client_cls.return_value = mock_client
 
         from app.config import settings
+
         await chat_complete([{"role": "user", "content": "test"}])
 
     assert captured["json"]["model"] == settings.LLM_MODEL_CHAT

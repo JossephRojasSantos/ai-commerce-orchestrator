@@ -76,7 +76,9 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         if _METRICS_AVAILABLE:
             try:
                 http_requests_total.labels(method=method, path=path, status=str(status)).inc()
-                http_request_duration_seconds.labels(method=method, path=path).observe(duration_ms / 1000)
+                http_request_duration_seconds.labels(method=method, path=path).observe(
+                    duration_ms / 1000
+                )
                 if status >= 400:
                     http_errors_total.labels(method=method, path=path, status=str(status)).inc()
             except Exception:

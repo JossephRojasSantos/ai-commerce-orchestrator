@@ -1,4 +1,5 @@
 """Integration tests: full graph flows with MemorySaver (no real Redis/LLM)."""
+
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -16,10 +17,20 @@ def _get_test_graph():
 
 async def test_buy_flow_e2e():
     graph = _get_test_graph()
-    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"buy","confidence":0.95}'):
-        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+    with patch(
+        "app.services.orchestrator.router.chat_complete",
+        new_callable=AsyncMock,
+        return_value='{"intent":"buy","confidence":0.95}',
+    ):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
-                with patch("app.services.orchestrator.agents.chat.chat_complete", new_callable=AsyncMock, return_value="Aquí tienes opciones de zapatos."):
+                with patch(
+                    "app.services.orchestrator.agents.chat.chat_complete",
+                    new_callable=AsyncMock,
+                    return_value="Aquí tienes opciones de zapatos.",
+                ):
                     config = {"configurable": {"thread_id": "web:test1"}}
                     from app.services.orchestrator.state import ConversationState
                     from langchain_core.messages import HumanMessage
@@ -44,12 +55,24 @@ async def test_buy_flow_e2e():
 async def test_track_flow_e2e():
     graph = _get_test_graph()
     mock_wc = AsyncMock()
-    mock_wc._get = AsyncMock(return_value={"status": "completed", "date_created": "2026-04-01T00:00:00"})
+    mock_wc._get = AsyncMock(
+        return_value={"status": "completed", "date_created": "2026-04-01T00:00:00"}
+    )
 
-    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"track","confidence":0.97}'):
-        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+    with patch(
+        "app.services.orchestrator.router.chat_complete",
+        new_callable=AsyncMock,
+        return_value='{"intent":"track","confidence":0.97}',
+    ):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
-                with patch("app.services.orchestrator.agents.tracking.get_wc_client", new_callable=AsyncMock, return_value=mock_wc):
+                with patch(
+                    "app.services.orchestrator.agents.tracking.get_wc_client",
+                    new_callable=AsyncMock,
+                    return_value=mock_wc,
+                ):
                     config = {"configurable": {"thread_id": "web:test2"}}
                     from app.services.orchestrator.state import ConversationState
                     from langchain_core.messages import HumanMessage
@@ -73,7 +96,9 @@ async def test_track_flow_e2e():
 async def test_fallback_flow_e2e():
     graph = _get_test_graph()
     with patch("app.services.orchestrator.router.chat_complete", side_effect=Exception("LLM down")):
-        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                 config = {"configurable": {"thread_id": "web:test3"}}
                 from app.services.orchestrator.state import ConversationState
@@ -112,13 +137,21 @@ async def test_state_persisted_between_messages():
         metadata={},
     )
 
-    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"other","confidence":0.8}'):
-        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+    with patch(
+        "app.services.orchestrator.router.chat_complete",
+        new_callable=AsyncMock,
+        return_value='{"intent":"other","confidence":0.8}',
+    ):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                 state1 = ConversationState(messages=[HumanMessage(content="hola")], **base_state)
                 result1 = await graph.ainvoke(state1, config=config)
 
-                state2 = ConversationState(messages=[HumanMessage(content="adiós")], **{**base_state, "trace_id": "t4b"})
+                state2 = ConversationState(
+                    messages=[HumanMessage(content="adiós")], **{**base_state, "trace_id": "t4b"}
+                )
                 result2 = await graph.ainvoke(state2, config=config)
 
     assert len(result2["messages"]) >= len(result1["messages"])
@@ -128,11 +161,14 @@ async def test_process_message_function():
     with patch("app.services.orchestrator.graph.get_graph") as mock_get_graph:
         mock_graph = AsyncMock()
         from langchain_core.messages import AIMessage
-        mock_graph.ainvoke = AsyncMock(return_value={
-            "messages": [AIMessage(content="Hola!")],
-            "intent": "other",
-            "agent": "fallback",
-        })
+
+        mock_graph.ainvoke = AsyncMock(
+            return_value={
+                "messages": [AIMessage(content="Hola!")],
+                "intent": "other",
+                "agent": "fallback",
+            }
+        )
         mock_get_graph.return_value = mock_graph
 
         result = await process_message(
@@ -163,10 +199,19 @@ async def test_agent_exception_triggers_fallback():
     """Covers graph.py lines 39-42: exception inside agent node → fallback."""
     graph = _get_test_graph()
 
-    with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"buy","confidence":0.9}'):
-        with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+    with patch(
+        "app.services.orchestrator.router.chat_complete",
+        new_callable=AsyncMock,
+        return_value='{"intent":"buy","confidence":0.9}',
+    ):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
             with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
-                with patch("app.services.orchestrator.agents.chat.run", side_effect=Exception("agent crashed")):
+                with patch(
+                    "app.services.orchestrator.agents.chat.run",
+                    side_effect=Exception("agent crashed"),
+                ):
                     config = {"configurable": {"thread_id": "web:test_exc"}}
                     state = ConversationState(
                         messages=[HumanMessage(content="quiero comprar algo")],
@@ -193,8 +238,16 @@ async def test_agent_degraded_triggers_fallback():
     # Mark "chat" agent as degraded
     errors_mod._degraded_until["chat"] = time.monotonic() + 60.0
     try:
-        with patch("app.services.orchestrator.router.chat_complete", new_callable=AsyncMock, return_value='{"intent":"buy","confidence":0.9}'):
-            with patch("app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None):
+        with patch(
+            "app.services.orchestrator.router.chat_complete",
+            new_callable=AsyncMock,
+            return_value='{"intent":"buy","confidence":0.9}',
+        ):
+            with patch(
+                "app.services.orchestrator.router.cache_get",
+                new_callable=AsyncMock,
+                return_value=None,
+            ):
                 with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
                     config = {"configurable": {"thread_id": "web:test_deg"}}
                     state = ConversationState(

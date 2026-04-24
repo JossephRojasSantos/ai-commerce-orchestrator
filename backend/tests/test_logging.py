@@ -64,4 +64,4 @@ def test_metrics_counter_increments_on_request():
 
     resp = client.get("/metrics")
     assert resp.status_code == 200
-    assert 'http_requests_total{' in resp.text
+    assert "http_requests_total{" in resp.text

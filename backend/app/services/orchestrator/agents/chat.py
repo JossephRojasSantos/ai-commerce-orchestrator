@@ -25,12 +25,18 @@ async def run(state: ConversationState) -> dict:
     last = state["messages"][-1]
     user_text = last.content if hasattr(last, "content") else str(last)
 
-    messages = [{"role": "system", "content": _SYSTEM}] + history + [{"role": "user", "content": user_text}]
+    messages = (
+        [{"role": "system", "content": _SYSTEM}]
+        + history
+        + [{"role": "user", "content": user_text}]
+    )
 
     reply = await chat_complete(
         messages,
         model=settings.LLM_MODEL_CHAT,
         fallback=settings.LLM_FALLBACK_CHAT,
     )
-    logger.info("chat_agent_replied", session_id=state.get("session_id"), trace_id=state.get("trace_id"))
+    logger.info(
+        "chat_agent_replied", session_id=state.get("session_id"), trace_id=state.get("trace_id")
+    )
     return {"messages": [AIMessage(content=reply)], "agent": "chat"}

@@ -72,7 +72,9 @@ async def classify_intent(text: str, session_id: str) -> RouterResult:
         intent = Intent(data.get("intent", "other"))
         confidence = float(data.get("confidence", 0.5))
         result = RouterResult(intent, confidence)
-        await cache_set(cache_key, {"intent": intent.value, "confidence": confidence}, settings.INTENT_CACHE_TTL)
+        await cache_set(
+            cache_key, {"intent": intent.value, "confidence": confidence}, settings.INTENT_CACHE_TTL
+        )
         return result
     except Exception as exc:
         logger.warning("intent_llm_failed", error=str(exc), text=text[:80])

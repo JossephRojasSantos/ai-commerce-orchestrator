@@ -1,4 +1,5 @@
 """Coverage for app/routers/whatsapp.py — webhook verify + receive."""
+
 import hashlib
 import hmac
 import json
@@ -114,7 +115,9 @@ async def test_webhook_receive_enqueues_message(wa_client):
                     {
                         "field": "messages",
                         "value": {
-                            "messages": [{"id": message_id, "type": "text", "text": {"body": "hola"}}]
+                            "messages": [
+                                {"id": message_id, "type": "text", "text": {"body": "hola"}}
+                            ]
                         },
                     }
                 ]
@@ -176,15 +179,7 @@ async def test_webhook_receive_duplicate_message_skipped(wa_client):
 
 @pytest.mark.asyncio
 async def test_webhook_receive_non_messages_field_ignored(wa_client):
-    payload = {
-        "entry": [
-            {
-                "changes": [
-                    {"field": "statuses", "value": {}}
-                ]
-            }
-        ]
-    }
+    payload = {"entry": [{"changes": [{"field": "statuses", "value": {}}]}]}
     body = json.dumps(payload).encode()
     sig = _sign(body)
 

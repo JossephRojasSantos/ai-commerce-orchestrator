@@ -1,12 +1,12 @@
 import json
 import re
-from enum import Enum
+from enum import StrEnum
 
 import structlog
 
 from app.clients.llm import chat_complete
-from app.core.cache import cache_get, cache_set
 from app.config import settings
+from app.core.cache import cache_get, cache_set
 
 logger = structlog.get_logger()
 
@@ -27,7 +27,7 @@ _CLASSIFIER_PROMPT = (
 )
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     BUY = "buy"
     TRACK = "track"
     RECOMMEND = "recommend"

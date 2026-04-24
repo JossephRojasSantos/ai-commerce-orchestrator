@@ -34,9 +34,9 @@ def record_agent_success(agent_name: str) -> None:
     _degraded_until.pop(agent_name, None)
 
 
-async def run_with_timeout(coro, timeout: float, agent_name: str):
+async def run_with_timeout(coro: object, deadline: float, agent_name: str):
     try:
-        return await asyncio.wait_for(coro, timeout=timeout)
+        return await asyncio.wait_for(coro, timeout=deadline)
     except TimeoutError:
-        logger.error("agent_timeout", agent=agent_name, timeout=timeout)
+        logger.error("agent_timeout", agent=agent_name, timeout=deadline)
         raise

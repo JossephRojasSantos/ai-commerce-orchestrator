@@ -5,7 +5,6 @@ import json
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
-import redis.asyncio as aioredis
 
 from app.config import settings
 from app.core.cache import get_redis
@@ -49,7 +48,7 @@ async def receive_webhook(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Invalid signature")
 
     payload = json.loads(body)
-    redis: Redis = get_redis()
+    redis = get_redis()
 
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):

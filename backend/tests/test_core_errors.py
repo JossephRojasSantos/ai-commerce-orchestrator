@@ -54,7 +54,7 @@ async def test_run_with_timeout_success():
     async def fast():
         return 42
 
-    result = await run_with_timeout(fast(), timeout=5.0, agent_name="test")
+    result = await run_with_timeout(fast(), deadline=5.0, agent_name="test")
     assert result == 42
 
 
@@ -64,4 +64,4 @@ async def test_run_with_timeout_raises_on_timeout():
         await asyncio.sleep(10)
 
     with pytest.raises(TimeoutError):
-        await run_with_timeout(slow(), timeout=0.01, agent_name="slow_agent")
+        await run_with_timeout(slow(), deadline=0.01, agent_name="slow_agent")

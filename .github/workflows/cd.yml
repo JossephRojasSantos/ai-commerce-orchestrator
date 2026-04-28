@@ -96,4 +96,4 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             sleep 20
-            curl -f http://localhost:8000/health || (docker logs ai-backend --tail 50 && exit 1)
+            curl -fL http://localhost:8000/health/ || (docker logs ai-backend --tail 50 && exit 1)

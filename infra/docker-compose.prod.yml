@@ -1,0 +1,47 @@
+# Production compose — Oracle Cloud (1 CPU / 6 GB ARM64)
+# Lightweight: backend + redis only. No rabbitmq, no postgres exposed.
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    name: ai-redis-data
+
+services:
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/ai-commerce-backend:${IMAGE_TAG:-latest}
+    container_name: ai-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      - ai-network
+    env_file:
+      - .env.prod
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru

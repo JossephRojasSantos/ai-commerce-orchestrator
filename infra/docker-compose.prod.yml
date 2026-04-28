@@ -20,7 +20,7 @@ services:
     networks:
       - ai-network
     env_file:
-      - .env.prod
+      - ../.env.prod
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s

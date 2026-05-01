@@ -11,7 +11,7 @@ from app.core.errors import (
 )
 from app.services.orchestrator.agents import chat, fallback, recommendation, tracking
 from app.services.orchestrator.checkpointer import get_checkpointer
-from app.services.orchestrator.handoff import route_intent
+from app.services.orchestrator.handoff import check_handoff, route_intent
 from app.services.orchestrator.router import classify_intent
 from app.services.orchestrator.state import ConversationState
 
@@ -59,8 +59,9 @@ def build_graph():
     builder.set_entry_point("router")
     builder.add_conditional_edges("router", route_intent)
 
-    for node in ("chat_agent", "tracking_agent", "reco_agent", "fallback_agent"):
-        builder.add_edge(node, END)
+    for node in ("chat_agent", "tracking_agent", "reco_agent"):
+        builder.add_conditional_edges(node, check_handoff, {"fallback_agent": "fallback_agent", "__end__": END})
+    builder.add_edge("fallback_agent", END)
 
     checkpointer = get_checkpointer()
     return builder.compile(checkpointer=checkpointer)
@@ -97,6 +98,8 @@ async def process_message(
         "user_id": user_id,
         "agent": "",
         "metadata": metadata or {},
+        "needs_handoff": False,
+        "handoff_count": 0,
     }
 
     final_state = await graph.ainvoke(initial_state, config=config)

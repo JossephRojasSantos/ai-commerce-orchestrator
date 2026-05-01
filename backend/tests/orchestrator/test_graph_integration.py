@@ -45,6 +45,8 @@ async def test_buy_flow_e2e():
                         user_id="test1",
                         agent="",
                         metadata={},
+                        needs_handoff=False,
+                        handoff_count=0,
                     )
                     result = await graph.ainvoke(state, config=config)
     assert result["intent"] == "buy"
@@ -87,6 +89,8 @@ async def test_track_flow_e2e():
                         user_id="test2",
                         agent="",
                         metadata={},
+                        needs_handoff=False,
+                        handoff_count=0,
                     )
                     result = await graph.ainvoke(state, config=config)
     assert result["intent"] == "track"
@@ -114,6 +118,8 @@ async def test_fallback_flow_e2e():
                     user_id="test3",
                     agent="",
                     metadata={},
+                    needs_handoff=False,
+                    handoff_count=0,
                 )
                 result = await graph.ainvoke(state, config=config)
     assert result["agent"] == "fallback"
@@ -135,6 +141,8 @@ async def test_state_persisted_between_messages():
         user_id="test4",
         agent="",
         metadata={},
+        needs_handoff=False,
+        handoff_count=0,
     )
 
     with patch(
@@ -223,6 +231,8 @@ async def test_agent_exception_triggers_fallback():
                         user_id="test_exc",
                         agent="",
                         metadata={},
+                        needs_handoff=False,
+                        handoff_count=0,
                     )
                     result = await graph.ainvoke(state, config=config)
 
@@ -260,9 +270,51 @@ async def test_agent_degraded_triggers_fallback():
                         user_id="test_deg",
                         agent="",
                         metadata={},
+                        needs_handoff=False,
+                        handoff_count=0,
                     )
                     result = await graph.ainvoke(state, config=config)
     finally:
         errors_mod._degraded_until.pop("chat", None)
 
     assert result["agent"] == "fallback"
+
+
+async def test_tracking_wc_error_escalates_to_fallback():
+    """WC error in tracking_agent sets needs_handoff=True → check_handoff → fallback_agent."""
+    from app.clients.woocommerce import WCServerError
+
+    graph = _get_test_graph()
+
+    with patch(
+        "app.services.orchestrator.router.chat_complete",
+        new_callable=AsyncMock,
+        return_value='{"intent":"track","confidence":0.98}',
+    ):
+        with patch(
+            "app.services.orchestrator.router.cache_get", new_callable=AsyncMock, return_value=None
+        ):
+            with patch("app.services.orchestrator.router.cache_set", new_callable=AsyncMock):
+                with patch(
+                    "app.services.orchestrator.agents.tracking.get_wc_client",
+                    new_callable=AsyncMock,
+                    side_effect=WCServerError(503, "timeout"),
+                ):
+                    config = {"configurable": {"thread_id": "web:test_handoff"}}
+                    state = ConversationState(
+                        messages=[HumanMessage(content="pedido 99999 dónde está")],
+                        intent="",
+                        confidence=0.0,
+                        session_id="web:test_handoff",
+                        trace_id="t_hf",
+                        channel="web",
+                        user_id="test_handoff",
+                        agent="",
+                        metadata={},
+                        needs_handoff=False,
+                        handoff_count=0,
+                    )
+                    result = await graph.ainvoke(state, config=config)
+
+    assert result["agent"] == "fallback"
+    assert result.get("needs_handoff") is True

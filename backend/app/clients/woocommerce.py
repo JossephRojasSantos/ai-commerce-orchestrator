@@ -1,9 +1,4 @@
-import hashlib
-import hmac
 import time
-import uuid
-from base64 import b64encode
-from urllib.parse import quote, urlencode
 
 import httpx
 import structlog
@@ -32,46 +27,22 @@ class WooCommerceClient:
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "WooCommerceClient":
-        self._client = httpx.AsyncClient(timeout=settings.WC_TIMEOUT)
+        # Basic Auth over HTTPS — simpler and correct for SSL endpoints
+        self._client = httpx.AsyncClient(
+            timeout=settings.WC_TIMEOUT,
+            auth=(settings.WC_CONSUMER_KEY, settings.WC_CONSUMER_SECRET),
+            follow_redirects=True,
+        )
         return self
 
     async def __aexit__(self, *args) -> None:
         if self._client:
             await self._client.aclose()
 
-    def _sign(self, method: str, url: str, params: dict) -> dict:
-        oauth_params = {
-            "oauth_consumer_key": settings.WC_CONSUMER_KEY,
-            "oauth_nonce": uuid.uuid4().hex,
-            "oauth_signature_method": "HMAC-SHA256",
-            "oauth_timestamp": str(int(time.time())),
-            "oauth_version": "1.0",
-        }
-        all_params = {**params, **oauth_params}
-        sorted_params = urlencode(sorted(all_params.items()))
-        base_string = "&".join(
-            [
-                method.upper(),
-                quote(url, safe=""),
-                quote(sorted_params, safe=""),
-            ]
-        )
-        signing_key = f"{quote(settings.WC_CONSUMER_SECRET, safe='')}&"
-        signature = b64encode(
-            hmac.new(
-                signing_key.encode(),
-                base_string.encode(),
-                hashlib.sha256,
-            ).digest()
-        ).decode()
-        oauth_params["oauth_signature"] = signature
-        return oauth_params
-
     async def _get(self, path: str, params: dict | None = None) -> dict | list:
         params = params or {}
         url = f"{settings.WC_BASE_URL}{path}"
-        oauth = self._sign("GET", url, params)
-        all_params = {**params, **oauth}
+        all_params = {**params}
         start = time.monotonic()
         try:
             resp = await self._client.get(url, params=all_params)

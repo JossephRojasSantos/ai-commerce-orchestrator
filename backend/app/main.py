@@ -1,3 +1,7 @@
+import asyncio
+import contextlib
+from contextlib import asynccontextmanager
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +16,18 @@ from app.schemas.errors import ErrorResponse
 logger = structlog.get_logger()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.workers.whatsapp_consumer import run_consumer
+
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_consumer(stop_event))
+    yield
+    stop_event.set()
+    with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=10)
+
+
 def create_app() -> FastAPI:
     setup_logging(settings)
 
@@ -19,6 +35,7 @@ def create_app() -> FastAPI:
         title="AI Commerce Orchestrator",
         version=settings.APP_VERSION,
         description="Backend base para agentes IA de comercio electrónico",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

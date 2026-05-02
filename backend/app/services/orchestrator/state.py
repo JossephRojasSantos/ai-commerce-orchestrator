@@ -13,3 +13,5 @@ class ConversationState(TypedDict):
     user_id: str
     agent: str
     metadata: dict
+    needs_handoff: bool
+    handoff_count: int

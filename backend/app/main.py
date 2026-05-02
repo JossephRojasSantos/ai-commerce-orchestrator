@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 
 import structlog
@@ -23,10 +24,8 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(run_consumer(stop_event))
     yield
     stop_event.set()
-    try:
+    with contextlib.suppress(TimeoutError, asyncio.CancelledError):
         await asyncio.wait_for(task, timeout=10)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
-        pass
 
 
 def create_app() -> FastAPI:

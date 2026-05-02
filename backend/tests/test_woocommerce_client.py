@@ -1,3 +1,6 @@
+import asyncio
+from unittest.mock import MagicMock, patch
+
 import httpx
 import pytest
 from app.clients.woocommerce import WooCommerceClient
@@ -12,8 +15,6 @@ def client():
 
 def test_client_uses_basic_auth():
     """WooCommerceClient uses HTTP Basic Auth (consumer_key:consumer_secret) over HTTPS."""
-    import asyncio
-    from unittest.mock import patch, MagicMock
 
     mock_cfg = MagicMock()
     mock_cfg.WC_CONSUMER_KEY = "ck_test"

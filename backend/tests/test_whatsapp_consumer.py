@@ -1,7 +1,6 @@
 """E2E tests for WhatsApp consumer worker — AI-120."""
 
 import asyncio
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest

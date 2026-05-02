@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import uuid
 
@@ -47,13 +48,11 @@ async def _handle(message: dict) -> None:
         )
     except Exception as exc:
         logger.error("wa.consumer.error", phone=phone, trace_id=trace_id, error=str(exc))
-        try:
+        with contextlib.suppress(Exception):
             await send_text_message(
                 phone=phone,
                 text="Lo siento, ocurrió un error. Por favor intenta de nuevo en unos minutos.",
             )
-        except Exception:
-            pass
 
 
 async def run_consumer(stop_event: asyncio.Event) -> None:

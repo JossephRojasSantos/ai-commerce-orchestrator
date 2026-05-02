@@ -44,7 +44,11 @@ async def run(state: ConversationState) -> dict:
     except (WCClientError, WCServerError) as exc:
         logger.warning("tracking_wc_error", order_id=order_id, error=str(exc))
         return {
-            "messages": [AIMessage(content=f"No pude obtener información del pedido #{order_id}. Intenta más tarde.")],
+            "messages": [
+                AIMessage(
+                    content=f"No pude obtener información del pedido #{order_id}. Intenta más tarde."
+                )
+            ],
             "agent": "tracking",
             "needs_handoff": True,
             "handoff_count": state.get("handoff_count", 0) + 1,

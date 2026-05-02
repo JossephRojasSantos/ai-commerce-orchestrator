@@ -22,6 +22,7 @@ def test_client_uses_basic_auth():
     mock_cfg.WC_TIMEOUT = 10.0
 
     with patch("app.clients.woocommerce.settings", mock_cfg):
+
         async def run():
             async with WooCommerceClient() as c:
                 auth = c._client.auth

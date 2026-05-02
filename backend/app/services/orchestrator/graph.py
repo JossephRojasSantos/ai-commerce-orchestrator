@@ -60,7 +60,9 @@ def build_graph():
     builder.add_conditional_edges("router", route_intent)
 
     for node in ("chat_agent", "tracking_agent", "reco_agent"):
-        builder.add_conditional_edges(node, check_handoff, {"fallback_agent": "fallback_agent", "__end__": END})
+        builder.add_conditional_edges(
+            node, check_handoff, {"fallback_agent": "fallback_agent", "__end__": END}
+        )
     builder.add_edge("fallback_agent", END)
 
     checkpointer = get_checkpointer()

@@ -40,7 +40,7 @@ def test_route_intent(intent, expected_node):
     [
         (True, 0, "fallback_agent"),
         (True, 1, "fallback_agent"),
-        (True, 2, "__end__"),   # at max → no more escalation
+        (True, 2, "__end__"),  # at max → no more escalation
         (False, 0, "__end__"),
         (False, 1, "__end__"),
     ],

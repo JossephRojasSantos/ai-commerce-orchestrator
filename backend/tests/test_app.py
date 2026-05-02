@@ -138,6 +138,59 @@ class TestExceptionHandlers:
         assert "message" in data
         assert "request_id" in data
 
+    def test_wc_server_error_returns_503(self, client):
+        """WCServerError → 503 con code wc_unavailable."""
+        from app.clients.woocommerce import WCServerError
+        from fastapi import Request
+
+        test_app = create_app()
+
+        @test_app.get("/test-wc-server-err")
+        async def _raise(request: Request):
+            raise WCServerError(503, "gateway timeout")
+
+        c = TestClient(test_app, raise_server_exceptions=False)
+        resp = c.get("/test-wc-server-err")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["code"] == "wc_unavailable"
+        assert "request_id" in data
+
+    def test_wc_client_error_returns_422(self, client):
+        """WCClientError (4xx de WC) → 422 con code wc_client_error."""
+        from app.clients.woocommerce import WCClientError
+        from fastapi import Request
+
+        test_app = create_app()
+
+        @test_app.get("/test-wc-client-err")
+        async def _raise(request: Request):
+            raise WCClientError(404, "order not found")
+
+        c = TestClient(test_app, raise_server_exceptions=False)
+        resp = c.get("/test-wc-client-err")
+        assert resp.status_code == 422
+        data = resp.json()
+        assert data["code"] == "wc_client_error"
+        assert "request_id" in data
+
+    def test_generic_exception_returns_500(self, client):
+        """Excepción no manejada → 500 con code 500."""
+        from fastapi import Request
+
+        test_app = create_app()
+
+        @test_app.get("/test-generic-err")
+        async def _raise(request: Request):
+            raise RuntimeError("unexpected boom")
+
+        c = TestClient(test_app, raise_server_exceptions=False)
+        resp = c.get("/test-generic-err")
+        assert resp.status_code == 500
+        data = resp.json()
+        assert data["code"] == "500"
+        assert "request_id" in data
+
 
 class TestSetupLogging:
     def test_setup_logging_development_no_error(self):

@@ -75,16 +75,35 @@ def create_app() -> FastAPI:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    from app.clients.woocommerce import WCServerError
+    from app.clients.woocommerce import WCClientError, WCServerError
 
     @app.exception_handler(WCServerError)
     async def wc_server_error_handler(request: Request, exc: WCServerError):
         request_id = getattr(request.state, "request_id", "")
-        logger.error("wc_server_error", status_code=exc.status_code, request_id=request_id)
+        logger.error(
+            "wc_server_error",
+            status_code=exc.status_code,
+            method=request.method,
+            path=request.url.path,
+            request_id=request_id,
+        )
         error = ErrorResponse(
             code="wc_unavailable", message="WooCommerce service unavailable", request_id=request_id
         )
         return JSONResponse(status_code=503, content=error.model_dump())
+
+    @app.exception_handler(WCClientError)
+    async def wc_client_error_handler(request: Request, exc: WCClientError):
+        request_id = getattr(request.state, "request_id", "")
+        logger.warning(
+            "wc_client_error",
+            status_code=exc.status_code,
+            method=request.method,
+            path=request.url.path,
+            request_id=request_id,
+        )
+        error = ErrorResponse(code="wc_client_error", message=exc.message, request_id=request_id)
+        return JSONResponse(status_code=422, content=error.model_dump())
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -93,6 +112,8 @@ def register_exception_handlers(app: FastAPI) -> None:
             "http_error",
             status_code=exc.status_code,
             detail=exc.detail,
+            method=request.method,
+            path=request.url.path,
             request_id=request_id,
         )
         error = ErrorResponse(
@@ -110,8 +131,12 @@ def register_exception_handlers(app: FastAPI) -> None:
         request_id = getattr(request.state, "request_id", "")
         logger.error(
             "unhandled_exception",
-            exc_info=exc,
+            exc_type=type(exc).__name__,
+            exc_msg=str(exc),
+            method=request.method,
+            path=request.url.path,
             request_id=request_id,
+            exc_info=exc,
         )
         error = ErrorResponse(
             code="500",

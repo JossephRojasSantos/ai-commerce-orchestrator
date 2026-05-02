@@ -31,6 +31,7 @@ class WooCommerceClient:
         self._client = httpx.AsyncClient(
             timeout=settings.WC_TIMEOUT,
             auth=(settings.WC_CONSUMER_KEY, settings.WC_CONSUMER_SECRET),
+            follow_redirects=True,
         )
         return self
 

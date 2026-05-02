@@ -1,3 +1,5 @@
+import time
+
 import structlog
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
@@ -22,6 +24,11 @@ async def _router_node(state: ConversationState) -> dict:
     last = state["messages"][-1]
     text = last.content if hasattr(last, "content") else str(last)
     result = await classify_intent(text, state["session_id"])
+    logger.info(
+        "orchestrator.intent_classified",
+        intent=result.intent.value,
+        confidence=result.confidence,
+    )
     return {"intent": result.intent.value, "confidence": result.confidence}
 
 
@@ -86,8 +93,17 @@ async def process_message(
     trace_id: str,
     metadata: dict | None = None,
 ) -> dict:
-    graph = get_graph()
     session_id = f"{channel}:{user_id}"
+    structlog.contextvars.bind_contextvars(
+        trace_id=trace_id,
+        session_id=session_id,
+        channel=channel,
+        user_id=user_id,
+    )
+    logger.info("orchestrator.start", text_len=len(text))
+    t0 = time.perf_counter()
+
+    graph = get_graph()
     config = {"configurable": {"thread_id": session_id}}
 
     initial_state: ConversationState = {
@@ -106,10 +122,19 @@ async def process_message(
 
     final_state = await graph.ainvoke(initial_state, config=config)
     last_msg = final_state["messages"][-1]
+    intent = final_state.get("intent", "other")
+    agent = final_state.get("agent", "")
+
+    logger.info(
+        "orchestrator.done",
+        intent=intent,
+        agent=agent,
+        duration_ms=round((time.perf_counter() - t0) * 1000, 2),
+    )
     return {
         "reply": last_msg.content if hasattr(last_msg, "content") else str(last_msg),
-        "intent": final_state.get("intent", "other"),
-        "agent": final_state.get("agent", ""),
+        "intent": intent,
+        "agent": agent,
         "session_id": session_id,
         "trace_id": trace_id,
     }

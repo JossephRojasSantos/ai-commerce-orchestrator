@@ -1,4 +1,4 @@
-"""Unit tests for app/clients/llm.py — verifies OpenRouter headers and fallback payload."""
+"""Unit tests for app/clients/llm.py — verifies OpenAI-compatible request."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,7 +15,7 @@ def _mock_response(content: str = "OK") -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_chat_complete_sends_openrouter_headers():
+async def test_chat_complete_sends_auth_header_only():
     captured = {}
 
     async def fake_post(url, headers=None, json=None, **kwargs):
@@ -33,14 +33,13 @@ async def test_chat_complete_sends_openrouter_headers():
         result = await chat_complete([{"role": "user", "content": "test"}])
 
     assert result == "hola"
-    assert "HTTP-Referer" in captured["headers"]
-    assert "X-Title" in captured["headers"]
-    assert captured["headers"]["X-OR-Prompt-Training"] == "false"
     assert "Authorization" in captured["headers"]
+    assert "HTTP-Referer" not in captured["headers"]
+    assert "X-OR-Prompt-Training" not in captured["headers"]
 
 
 @pytest.mark.asyncio
-async def test_chat_complete_with_fallback_sets_models_field():
+async def test_chat_complete_with_fallback_no_models_field():
     captured = {}
 
     async def fake_post(url, headers=None, json=None, **kwargs):
@@ -56,12 +55,12 @@ async def test_chat_complete_with_fallback_sets_models_field():
 
         await chat_complete(
             [{"role": "user", "content": "test"}],
-            model="openai/gpt-4o-mini",
-            fallback="anthropic/claude-haiku-4-5",
+            model="gpt-4o-mini",
+            fallback="gpt-3.5-turbo",
         )
 
-    assert captured["json"]["models"] == ["openai/gpt-4o-mini", "anthropic/claude-haiku-4-5"]
-    assert captured["json"]["model"] == "openai/gpt-4o-mini"
+    assert "models" not in captured["json"]
+    assert captured["json"]["model"] == "gpt-4o-mini"
 
 
 @pytest.mark.asyncio

@@ -60,9 +60,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
-          source: "infra/docker-compose.prod.yml,infra/docker/prometheus.yml,infra/db/init.sql"
+          source: "infra/docker-compose.prod.yml,infra/docker/prometheus.yml"
           target: ${{ secrets.DEPLOY_PATH }}
-          overwrite: true
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3

@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.middleware import IPRateLimitMiddleware, RequestIDMiddleware, setup_logging
 from app.routers.health import router as health_router
+from app.routers.legal import router as legal_router
 from app.schemas.errors import ErrorResponse
 
 logger = structlog.get_logger()
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     app.add_middleware(IPRateLimitMiddleware)
 
     app.include_router(health_router)
+    app.include_router(legal_router)
 
     from app.routers.orders import router as orders_router
     from app.routers.products import router as products_router

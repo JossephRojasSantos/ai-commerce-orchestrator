@@ -7,10 +7,9 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.config import settings
 from app.main import app
+from httpx import ASGITransport, AsyncClient
 
 
 def _sign(body: bytes, secret: str) -> str:

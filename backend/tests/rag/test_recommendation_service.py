@@ -1,7 +1,6 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.schemas.rag import RAGRequest, RAGResponse
 from app.services.rag.recommendation import recommend
 

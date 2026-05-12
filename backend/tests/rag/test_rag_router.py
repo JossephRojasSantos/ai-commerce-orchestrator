@@ -1,10 +1,9 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.main import app
 from app.schemas.rag import ProductHit, RAGResponse
+from httpx import ASGITransport, AsyncClient
 
 _FAKE_RESPONSE = RAGResponse(
     query="muñeca",

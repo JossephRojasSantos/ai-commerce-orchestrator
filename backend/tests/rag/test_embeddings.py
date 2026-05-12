@@ -1,9 +1,8 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
 import respx
-
 from app.clients.embeddings import embed_query, embed_texts
 from app.config import settings
 
@@ -68,7 +67,7 @@ async def test_embed_texts_batches_large_input():
     emb_module._cache.clear()
 
     texts = [f"text_{i}" for i in range(150)]
-    route = respx.post(f"{settings.LLM_API_BASE}/embeddings").mock(
+    respx.post(f"{settings.LLM_API_BASE}/embeddings").mock(
         side_effect=lambda req: httpx.Response(
             200,
             json=_embedding_response(

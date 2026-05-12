@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.services.rag.vector_store import VectorStore, get_vector_store
 
 

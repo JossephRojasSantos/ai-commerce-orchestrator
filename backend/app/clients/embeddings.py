@@ -30,7 +30,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if uncached_texts:
         vectors = await _fetch_embeddings(uncached_texts)
         async with _cache_lock:
-            for idx, vec, text in zip(uncached_idx, vectors, uncached_texts):
+            for idx, vec, text in zip(uncached_idx, vectors, uncached_texts, strict=False):
                 _cache[text] = vec
                 results[idx] = vec
 

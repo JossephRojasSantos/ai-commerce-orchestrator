@@ -27,7 +27,7 @@ async def recommend(req: RAGRequest) -> RAGResponse:
             store.search(vector, top_k=req.top_k, min_score=req.min_score),
             timeout=settings.RAG_TIMEOUT_SEC,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("rag_timeout", query=req.query[:60])
         return RAGResponse(
             query=req.query,

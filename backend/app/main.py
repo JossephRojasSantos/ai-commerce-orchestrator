@@ -67,9 +67,9 @@ def create_app() -> FastAPI:
         app.include_router(metrics_router)
 
     from app.routers.orchestrator import router as orchestrator_router
-    from app.routers.whatsapp import router as whatsapp_router
     from app.routers.rag import router as rag_router
     from app.routers.wc_webhook import router as wc_webhook_router
+    from app.routers.whatsapp import router as whatsapp_router
 
     app.include_router(orchestrator_router)
     app.include_router(whatsapp_router)

@@ -31,10 +31,9 @@ async def receive_wc_webhook(request: Request, background_tasks: BackgroundTasks
     signature = request.headers.get("X-WC-Webhook-Signature", "")
     topic = request.headers.get("X-WC-Webhook-Topic", "")
 
-    if settings.WC_WEBHOOK_SECRET:
-        if not _verify_signature(body, signature):
-            logger.warning("wc_webhook_invalid_signature", topic=topic)
-            raise HTTPException(status_code=401, detail="Invalid signature")
+    if settings.WC_WEBHOOK_SECRET and not _verify_signature(body, signature):
+        logger.warning("wc_webhook_invalid_signature", topic=topic)
+        raise HTTPException(status_code=401, detail="Invalid signature")
 
     try:
         payload = json.loads(body) if body else {}

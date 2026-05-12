@@ -41,13 +41,19 @@ async def test_fallback_returns_reply():
 
 
 async def test_reco_returns_placeholder():
+    from app.schemas.rag import RAGResponse
+
     state = _make_state("recomiéndame algo", intent="recommend")
-    result = await recommendation.run(state)
+    empty_response = RAGResponse(query="recomiéndame algo", hits=[], answer=None, latency_ms=10)
+    with patch(
+        "app.services.orchestrator.agents.recommendation.recommend",
+        new_callable=AsyncMock,
+        return_value=empty_response,
+    ):
+        result = await recommendation.run(state)
     assert result["agent"] == "recommendation"
-    assert (
-        "placeholder" in result["messages"][0].content.lower()
-        or "sugerencias" in result["messages"][0].content.lower()
-    )
+    assert isinstance(result["messages"][0], AIMessage)
+    assert len(result["messages"][0].content) > 0
 
 
 # --- ChatAgent ---

@@ -28,9 +28,19 @@ async def test_recommend_returns_hits_with_answer():
     req = RAGRequest(query="muñeca para niña", generate=True)
 
     with (
-        patch("app.services.rag.recommendation.embed_query", new_callable=AsyncMock, return_value=[0.1] * 1536),
-        patch("app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock) as mock_store_fn,
-        patch("app.services.rag.recommendation.chat_complete", new_callable=AsyncMock, return_value="Te recomiendo la Muñeca Mágica."),
+        patch(
+            "app.services.rag.recommendation.embed_query",
+            new_callable=AsyncMock,
+            return_value=[0.1] * 1536,
+        ),
+        patch(
+            "app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock
+        ) as mock_store_fn,
+        patch(
+            "app.services.rag.recommendation.chat_complete",
+            new_callable=AsyncMock,
+            return_value="Te recomiendo la Muñeca Mágica.",
+        ),
     ):
         mock_store = AsyncMock()
         mock_store.search = AsyncMock(return_value=[_FAKE_HIT])
@@ -50,8 +60,14 @@ async def test_recommend_no_hits_returns_empty():
     req = RAGRequest(query="producto inexistente", generate=True)
 
     with (
-        patch("app.services.rag.recommendation.embed_query", new_callable=AsyncMock, return_value=[0.1] * 1536),
-        patch("app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock) as mock_store_fn,
+        patch(
+            "app.services.rag.recommendation.embed_query",
+            new_callable=AsyncMock,
+            return_value=[0.1] * 1536,
+        ),
+        patch(
+            "app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock
+        ) as mock_store_fn,
     ):
         mock_store = AsyncMock()
         mock_store.search = AsyncMock(return_value=[])
@@ -68,8 +84,14 @@ async def test_recommend_generate_false_skips_llm():
     req = RAGRequest(query="juguete", generate=False)
 
     with (
-        patch("app.services.rag.recommendation.embed_query", new_callable=AsyncMock, return_value=[0.1] * 1536),
-        patch("app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock) as mock_store_fn,
+        patch(
+            "app.services.rag.recommendation.embed_query",
+            new_callable=AsyncMock,
+            return_value=[0.1] * 1536,
+        ),
+        patch(
+            "app.services.rag.recommendation.get_vector_store", new_callable=AsyncMock
+        ) as mock_store_fn,
         patch("app.services.rag.recommendation.chat_complete", new_callable=AsyncMock) as mock_llm,
     ):
         mock_store = AsyncMock()
@@ -85,9 +107,14 @@ async def test_recommend_generate_false_skips_llm():
 @pytest.mark.asyncio
 async def test_recommend_timeout_returns_empty():
     import asyncio
+
     req = RAGRequest(query="juguete", generate=False)
 
-    with patch("app.services.rag.recommendation.embed_query", new_callable=AsyncMock, side_effect=asyncio.TimeoutError):
+    with patch(
+        "app.services.rag.recommendation.embed_query",
+        new_callable=AsyncMock,
+        side_effect=asyncio.TimeoutError,
+    ):
         result = await recommend(req)
 
     assert result.hits == []

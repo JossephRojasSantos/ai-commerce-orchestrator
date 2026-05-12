@@ -13,9 +13,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _sign(body: bytes, secret: str) -> str:
-    return base64.b64encode(
-        hmac.new(secret.encode(), body, hashlib.sha256).digest()
-    ).decode()
+    return base64.b64encode(hmac.new(secret.encode(), body, hashlib.sha256).digest()).decode()
 
 
 async def _post(headers: dict, body: bytes) -> tuple[int, dict]:
@@ -36,9 +34,7 @@ async def test_webhook_product_created_ok(monkeypatch):
         "X-WC-Webhook-Topic": "product.created",
         "Content-Type": "application/json",
     }
-    with patch(
-        "app.routers.wc_webhook.index_product", new_callable=AsyncMock
-    ) as mock_index:
+    with patch("app.routers.wc_webhook.index_product", new_callable=AsyncMock) as mock_index:
         status, data = await _post(headers, body)
     assert status == 200
     assert data == {"ok": True}
@@ -56,9 +52,7 @@ async def test_webhook_product_updated_ok(monkeypatch):
         "X-WC-Webhook-Topic": "product.updated",
         "Content-Type": "application/json",
     }
-    with patch(
-        "app.routers.wc_webhook.index_product", new_callable=AsyncMock
-    ) as mock_index:
+    with patch("app.routers.wc_webhook.index_product", new_callable=AsyncMock) as mock_index:
         status, data = await _post(headers, body)
     assert status == 200
     assert data == {"ok": True}
@@ -76,9 +70,7 @@ async def test_webhook_product_deleted_ok(monkeypatch):
         "X-WC-Webhook-Topic": "product.deleted",
         "Content-Type": "application/json",
     }
-    with patch(
-        "app.routers.wc_webhook.delete_product", new_callable=AsyncMock
-    ) as mock_delete:
+    with patch("app.routers.wc_webhook.delete_product", new_callable=AsyncMock) as mock_delete:
         status, data = await _post(headers, body)
     assert status == 200
     assert data == {"ok": True}
@@ -107,9 +99,7 @@ async def test_webhook_no_secret_skips_verification(monkeypatch):
         "X-WC-Webhook-Topic": "product.created",
         "Content-Type": "application/json",
     }
-    with patch(
-        "app.routers.wc_webhook.index_product", new_callable=AsyncMock
-    ) as mock_index:
+    with patch("app.routers.wc_webhook.index_product", new_callable=AsyncMock) as mock_index:
         status, data = await _post(headers, body)
     assert status == 200
     assert data == {"ok": True}

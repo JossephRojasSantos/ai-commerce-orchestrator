@@ -8,12 +8,7 @@ from app.config import settings
 
 
 def _embedding_response(texts: list[str]) -> dict:
-    return {
-        "data": [
-            {"index": i, "embedding": [0.1] * 1536}
-            for i in range(len(texts))
-        ]
-    }
+    return {"data": [{"index": i, "embedding": [0.1] * 1536} for i in range(len(texts))]}
 
 
 @pytest.mark.asyncio
@@ -23,6 +18,7 @@ async def test_embed_texts_returns_vectors():
         return_value=httpx.Response(200, json=_embedding_response(["hello"]))
     )
     import app.clients.embeddings as emb_module
+
     emb_module._cache.clear()
 
     result = await embed_texts(["hello"])
@@ -34,6 +30,7 @@ async def test_embed_texts_returns_vectors():
 @respx.mock
 async def test_embed_texts_uses_cache():
     import app.clients.embeddings as emb_module
+
     emb_module._cache.clear()
 
     route = respx.post(f"{settings.LLM_API_BASE}/embeddings").mock(
@@ -53,6 +50,7 @@ async def test_embed_query_returns_single_vector():
         return_value=httpx.Response(200, json=_embedding_response(["query"]))
     )
     import app.clients.embeddings as emb_module
+
     emb_module._cache.clear()
 
     vec = await embed_query("query")
@@ -64,6 +62,7 @@ async def test_embed_query_returns_single_vector():
 @respx.mock
 async def test_embed_texts_batches_large_input():
     import app.clients.embeddings as emb_module
+
     emb_module._cache.clear()
 
     texts = [f"text_{i}" for i in range(150)]

@@ -45,9 +45,7 @@ async def recommend(req: RAGRequest) -> RAGResponse:
             {"role": "system", "content": SYSTEM_RECOMMEND},
             {
                 "role": "user",
-                "content": USER_RECOMMEND.format(
-                    query=req.query, products_block=products_block
-                ),
+                "content": USER_RECOMMEND.format(query=req.query, products_block=products_block),
             },
         ]
         try:
@@ -59,7 +57,9 @@ async def recommend(req: RAGRequest) -> RAGResponse:
             logger.warning("rag_llm_failed", error=str(exc))
 
     latency_ms = int((time.monotonic() - start) * 1000)
-    logger.info("rag_recommend", hits=len(hits), latency_ms=latency_ms, generated=answer is not None)
+    logger.info(
+        "rag_recommend", hits=len(hits), latency_ms=latency_ms, generated=answer is not None
+    )
     return RAGResponse(query=req.query, hits=hits, answer=answer, latency_ms=latency_ms)
 
 

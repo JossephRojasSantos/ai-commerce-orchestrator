@@ -97,3 +97,20 @@ jobs:
           script: |
             sleep 20
             curl -fL http://localhost:8000/health/ || (docker logs ai-backend --tail 50 && exit 1)
+
+      - name: Notify deploy result
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const sha = context.sha.slice(0, 7);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const emoji = status === 'success' ? '✅' : '❌';
+            const body = `${emoji} **Deploy ${status}** — \`${sha}\`\n\n[View run](${runUrl})`;
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body,
+            });

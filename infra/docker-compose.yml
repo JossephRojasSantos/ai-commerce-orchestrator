@@ -18,6 +18,8 @@ volumes:
     name: ai-rabbitmq-data
   grafana-data:
     name: ai-grafana-data
+  qdrant-data:
+    name: ai-qdrant-data
 
 services:
 
@@ -46,6 +48,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
 
   # ---------------------------
@@ -127,6 +131,30 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
     depends_on:
       - prometheus
+
+  # ---------------------------
+  # Vector DB — Qdrant
+  # ---------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: ai-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - ai-network
+    environment:
+      QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD: 20000
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # ---------------------------
   # Message Broker — RabbitMQ

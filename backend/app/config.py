@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     WC_BASE_URL: str = "https://tiendamagica.shop/wp-json/wc/v3"
     WC_CONSUMER_KEY: str = ""
     WC_CONSUMER_SECRET: str = ""
+    WC_WEBHOOK_SECRET: str = ""
     WC_TIMEOUT: float = 10.0
     WC_MAX_RETRIES: int = 3
     WC_CACHE_TTL_PRODUCTS: int = 300
@@ -52,6 +53,19 @@ class Settings(BaseSettings):
     ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD: int = 3
     ORCHESTRATOR_RATE_LIMIT_PER_MIN: int = 20
     INTENT_CACHE_TTL: int = 3600
+
+    # RAG / Vector DB (AI-29)
+    QDRANT_URL: str = "http://qdrant:6333"
+    QDRANT_COLLECTION: str = "wc_products"
+    QDRANT_VECTOR_SIZE: int = 1536
+    EMBEDDINGS_PROVIDER: str = "openai"
+    EMBEDDINGS_MODEL: str = "text-embedding-3-small"
+    EMBEDDINGS_CACHE_TTL: int = 3600
+    EMBEDDINGS_BATCH_SIZE: int = 100
+    RAG_TOP_K: int = 5
+    RAG_MIN_SCORE: float = 0.35
+    RAG_TIMEOUT_SEC: float = 2.8
+    RAG_LLM_ENABLED: bool = True
 
     # Auth & rate limiting
     ALLOWED_API_KEYS: list[str] = []

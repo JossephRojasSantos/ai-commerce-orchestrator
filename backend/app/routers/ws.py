@@ -52,9 +52,7 @@ async def ws_chat(
             msg_type = msg.get("type", "")
 
             if msg_type == "session_start":
-                await websocket.send_text(
-                    json.dumps({"type": "text", "content": _WELCOME})
-                )
+                await websocket.send_text(json.dumps({"type": "text", "content": _WELCOME}))
                 continue
 
             if msg_type != "message":

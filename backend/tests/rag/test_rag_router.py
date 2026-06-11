@@ -38,10 +38,13 @@ _FAKE_RESPONSE = RAGResponse(
 
 @pytest.mark.asyncio
 async def test_rag_recommend_ok():
-    with _patch_auth(), patch(
-        "app.routers.rag.recommend",
-        new_callable=AsyncMock,
-        return_value=_FAKE_RESPONSE,
+    with (
+        _patch_auth(),
+        patch(
+            "app.routers.rag.recommend",
+            new_callable=AsyncMock,
+            return_value=_FAKE_RESPONSE,
+        ),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -84,8 +87,9 @@ async def test_rag_recommend_no_api_key_rejected():
 @pytest.mark.asyncio
 async def test_rag_recommend_no_hits():
     empty = RAGResponse(query="xyz", hits=[], answer=None, latency_ms=50)
-    with _patch_auth(), patch(
-        "app.routers.rag.recommend", new_callable=AsyncMock, return_value=empty
+    with (
+        _patch_auth(),
+        patch("app.routers.rag.recommend", new_callable=AsyncMock, return_value=empty),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

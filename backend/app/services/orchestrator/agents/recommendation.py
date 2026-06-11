@@ -37,8 +37,9 @@ async def run(state: ConversationState) -> dict:
         reply = "Encontré estos productos que podrían interesarte:\n" + "\n".join(lines)
     else:
         reply = (
-            "No encontré productos que coincidan con tu búsqueda. "
-            "¿Puedes darme más detalles sobre lo que buscas?"
+            "Por ahora no tengo productos que encajen con eso. 🔍\n"
+            "Nuestro catálogo tiene productos de **cocina**, **hogar** y **tecnología** — "
+            "¿te muestro algo de esas categorías o me das más detalles de lo que buscas?"
         )
 
     logger.info(

@@ -13,7 +13,9 @@ Productos encontrados en el catálogo (ordenados por relevancia):
 
 Recomienda los productos más adecuados para la consulta del cliente. \
 Si hay productos en oferta menciónalos. \
-Incluye el enlace de cada producto recomendado."""
+Enlaza cada producto integrando el enlace en su nombre con formato \
+[Nombre del producto](enlace) — nunca escribas frases como "aquí tienes el enlace" \
+ni pegues la URL suelta. Máximo 2 párrafos cortos."""
 
 
 def build_products_block(hits: list[dict]) -> str:

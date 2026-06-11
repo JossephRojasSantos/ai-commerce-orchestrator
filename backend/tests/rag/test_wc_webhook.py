@@ -92,7 +92,8 @@ async def test_webhook_invalid_signature_rejected(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_webhook_no_secret_skips_verification(monkeypatch):
+async def test_webhook_no_secret_rejected(monkeypatch):
+    # Fail-closed: sin secret configurado el webhook no acepta payloads
     monkeypatch.setattr(settings, "WC_WEBHOOK_SECRET", "")
     body = json.dumps({"id": 5}).encode()
     headers = {
@@ -100,10 +101,9 @@ async def test_webhook_no_secret_skips_verification(monkeypatch):
         "Content-Type": "application/json",
     }
     with patch("app.routers.wc_webhook.index_product", new_callable=AsyncMock) as mock_index:
-        status, data = await _post(headers, body)
-    assert status == 200
-    assert data == {"ok": True}
-    mock_index.assert_called_once()
+        status, _ = await _post(headers, body)
+    assert status == 503
+    mock_index.assert_not_called()
 
 
 @pytest.mark.asyncio

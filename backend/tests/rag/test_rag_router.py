@@ -1,9 +1,17 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.main import app
 from app.schemas.rag import ProductHit, RAGResponse
 from httpx import ASGITransport, AsyncClient
+
+_API_KEY = "key-rag-test"
+_AUTH = {"Authorization": f"Bearer {_API_KEY}"}
+
+
+def _patch_auth():
+    return patch("app.core.auth.settings", MagicMock(ALLOWED_API_KEYS=[_API_KEY]))
+
 
 _FAKE_RESPONSE = RAGResponse(
     query="muñeca",
@@ -30,16 +38,20 @@ _FAKE_RESPONSE = RAGResponse(
 
 @pytest.mark.asyncio
 async def test_rag_recommend_ok():
-    with patch(
-        "app.routers.rag.recommend",
-        new_callable=AsyncMock,
-        return_value=_FAKE_RESPONSE,
+    with (
+        _patch_auth(),
+        patch(
+            "app.routers.rag.recommend",
+            new_callable=AsyncMock,
+            return_value=_FAKE_RESPONSE,
+        ),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post(
                 "/v1/rag/recommend",
                 json={"query": "muñeca", "top_k": 5, "min_score": 0.35, "generate": True},
+                headers=_AUTH,
             )
 
     assert resp.status_code == 200
@@ -52,22 +64,36 @@ async def test_rag_recommend_ok():
 
 @pytest.mark.asyncio
 async def test_rag_recommend_empty_query_rejected():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/v1/rag/recommend",
-            json={"query": "", "top_k": 5},
-        )
+    with _patch_auth():
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/v1/rag/recommend",
+                json={"query": "", "top_k": 5},
+                headers=_AUTH,
+            )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rag_recommend_no_api_key_rejected():
+    with _patch_auth():
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post("/v1/rag/recommend", json={"query": "muñeca"})
+    assert resp.status_code in (401, 422)
 
 
 @pytest.mark.asyncio
 async def test_rag_recommend_no_hits():
     empty = RAGResponse(query="xyz", hits=[], answer=None, latency_ms=50)
-    with patch("app.routers.rag.recommend", new_callable=AsyncMock, return_value=empty):
+    with (
+        _patch_auth(),
+        patch("app.routers.rag.recommend", new_callable=AsyncMock, return_value=empty),
+    ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/v1/rag/recommend", json={"query": "xyz"})
+            resp = await client.post("/v1/rag/recommend", json={"query": "xyz"}, headers=_AUTH)
 
     assert resp.status_code == 200
     assert resp.json()["hits"] == []

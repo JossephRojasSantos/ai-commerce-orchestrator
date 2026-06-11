@@ -6,12 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.auth import require_api_key
 from app.db.base import get_db
 from app.models.conversation import Conversation, Message
 from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
 from app.services.chat import handle_message
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(require_api_key)])
 
 
 async def get_redis():

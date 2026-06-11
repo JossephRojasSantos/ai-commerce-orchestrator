@@ -32,18 +32,23 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     setup_logging(settings)
 
+    is_production = settings.APP_ENV == "production"
+
     app = FastAPI(
         title="AI Commerce Orchestrator",
         version=settings.APP_VERSION,
         description="Backend base para agentes IA de comercio electrónico",
         lifespan=lifespan,
+        docs_url=None if is_production else "/docs",
+        redoc_url=None if is_production else "/redoc",
+        openapi_url=None if is_production else "/openapi.json",
     )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(IPRateLimitMiddleware)
@@ -70,11 +75,13 @@ def create_app() -> FastAPI:
     from app.routers.rag import router as rag_router
     from app.routers.wc_webhook import router as wc_webhook_router
     from app.routers.whatsapp import router as whatsapp_router
+    from app.routers.ws import router as ws_router
 
     app.include_router(orchestrator_router)
     app.include_router(whatsapp_router)
     app.include_router(rag_router)
     app.include_router(wc_webhook_router)
+    app.include_router(ws_router)
 
     register_exception_handlers(app)
     return app

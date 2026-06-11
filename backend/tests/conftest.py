@@ -154,7 +154,10 @@ async def db_session():
 @pytest.fixture
 async def app_client(fake_redis):
     """Async HTTP client wired to the FastAPI app with SQLite DB override."""
+    from app.core.auth import require_api_key
     from app.db.base import get_db
+
+    app.dependency_overrides[require_api_key] = lambda: "test-key"
 
     engine = await _make_sqlite_engine()
     AsyncTestSession = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
@@ -170,4 +173,5 @@ async def app_client(fake_redis):
         yield client
 
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(require_api_key, None)
     await engine.dispose()

@@ -41,7 +41,16 @@ async def run(state: ConversationState) -> dict:
         reply = f"Tu pedido #{order_id} está **{status}**."
         if order.get("date_created"):
             reply += f" Fecha: {order['date_created'][:10]}."
-    except (WCClientError, WCServerError) as exc:
+    except WCClientError as exc:
+        # 404/4xx = pedido no existe — respuesta directa, sin handoff
+        # (el handoff al fallback pisaría este mensaje con el saludo genérico)
+        logger.warning("tracking_order_not_found", order_id=order_id, error=str(exc))
+        reply = (
+            f"No encontré ningún pedido con el número #{order_id}. "
+            "Verifica el número en tu correo de confirmación e inténtalo de nuevo."
+        )
+        return {"messages": [AIMessage(content=reply)], "agent": "tracking", "needs_handoff": False}
+    except WCServerError as exc:
         logger.warning("tracking_wc_error", order_id=order_id, error=str(exc))
         return {
             "messages": [

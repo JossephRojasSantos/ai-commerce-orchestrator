@@ -6,9 +6,10 @@ from app.services.orchestrator.state import ConversationState
 logger = structlog.get_logger()
 
 _REPLY = (
-    "Hola, soy el asistente de Tienda Mágica. "
-    "Puedo ayudarte a buscar productos, hacer un pedido o revisar el estado de tu compra. "
-    "¿En qué te puedo ayudar?"
+    "No estoy seguro de haber entendido. "
+    "Puedo buscar productos, recomendarte algo según lo que necesites, "
+    "o revisar el estado de tu pedido si me das el número. "
+    "¿Puedes contarme un poco más?"
 )
 
 

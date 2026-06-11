@@ -47,8 +47,7 @@ _REPLY_PAYMENT = (
     "Todos los pagos son 100% seguros."
 )
 _REPLY_RETURNS = (
-    "↩️ Tienes 30 días para devoluciones. "
-    "Escríbenos por WhatsApp y te acompañamos en el proceso."
+    "↩️ Tienes 30 días para devoluciones. Escríbenos por WhatsApp y te acompañamos en el proceso."
 )
 _REPLY_DEFAULT = (
     "No estoy seguro de haber entendido. "

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.core.auth import require_api_key
 from app.schemas.woocommerce import WCOrder
 from app.services import orders as order_service
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/{order_id}", response_model=WCOrder)

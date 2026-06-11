@@ -146,11 +146,9 @@ services:
       - qdrant-data:/qdrant/storage
     networks:
       - ai-network
-    environment:
-      QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD: 20000
     mem_limit: 512m
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/6333"]
       interval: 15s
       timeout: 5s
       retries: 5

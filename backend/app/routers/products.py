@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.core.auth import require_api_key
 from app.schemas.woocommerce import WCProduct
 from app.services import products as product_service
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(
+    prefix="/products", tags=["products"], dependencies=[Depends(require_api_key)]
+)
 
 
 @router.get("", response_model=list[WCProduct])

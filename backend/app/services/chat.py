@@ -55,7 +55,8 @@ async def handle_message(
 ) -> ChatResponse:
     start = time.monotonic()
 
-    rate_key = f"ratelimit:chat:{req.session_id}"
+    # IP como clave primaria: session_id lo controla el cliente y permite bypass rotando UUIDs
+    rate_key = f"ratelimit:chat:{user_ip or req.session_id}"
     count = await redis.incr(rate_key)
     if count == 1:
         await redis.expire(rate_key, 60)

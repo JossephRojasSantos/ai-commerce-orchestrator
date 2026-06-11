@@ -50,8 +50,10 @@ async def test_search_returns_formatted_hits():
     hit.score = 0.9
     hit.payload = {"name": "Toy", "price": "10.00"}
 
+    response = MagicMock()
+    response.points = [hit]
     client = _make_client()
-    client.search = AsyncMock(return_value=[hit])
+    client.query_points = AsyncMock(return_value=response)
     store = VectorStore(client)
 
     results = await store.search([0.1] * 1536)

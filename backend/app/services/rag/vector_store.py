@@ -55,15 +55,16 @@ class VectorStore:
         filters: qmodels.Filter | None = None,
     ) -> list[dict[str, Any]]:
         k = top_k or settings.RAG_TOP_K
-        results = await self._client.search(
+        # qdrant-client >= 1.13 eliminó AsyncQdrantClient.search; query_points lo reemplaza
+        response = await self._client.query_points(
             collection_name=settings.QDRANT_COLLECTION,
-            query_vector=vector,
+            query=vector,
             limit=k,
             score_threshold=min_score or settings.RAG_MIN_SCORE,
             query_filter=filters,
             with_payload=True,
         )
-        return [{"id": r.id, "score": r.score, "payload": r.payload} for r in results]
+        return [{"id": r.id, "score": r.score, "payload": r.payload} for r in response.points]
 
     async def delete(self, ids: list[int | str]) -> None:
         await self._client.delete(

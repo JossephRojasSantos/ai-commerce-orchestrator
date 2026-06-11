@@ -22,7 +22,10 @@ except ImportError:
 
 log = structlog.get_logger()
 
-_RATE_LIMIT_SKIP = ("/health", "/metrics", "/api/whatsapp/webhook")
+# /webhooks/wc fuera del rate limit: importaciones masivas (p.ej. dropshipping)
+# disparan ráfagas de webhooks y WC desactiva el webhook tras entregas fallidas.
+# El endpoint ya está protegido por firma HMAC.
+_RATE_LIMIT_SKIP = ("/health", "/metrics", "/api/whatsapp/webhook", "/webhooks/wc")
 
 
 class IPRateLimitMiddleware(BaseHTTPMiddleware):

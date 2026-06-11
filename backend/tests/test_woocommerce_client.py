@@ -13,8 +13,8 @@ def client():
     return c
 
 
-def test_client_uses_basic_auth():
-    """WooCommerceClient uses HTTP Basic Auth (consumer_key:consumer_secret) over HTTPS."""
+def test_client_uses_query_param_credentials():
+    """Credenciales como query params — LiteSpeed descarta el header Authorization."""
 
     mock_cfg = MagicMock()
     mock_cfg.WC_CONSUMER_KEY = "ck_test"
@@ -25,12 +25,12 @@ def test_client_uses_basic_auth():
 
         async def run():
             async with WooCommerceClient() as c:
-                auth = c._client.auth
-                return auth
+                return dict(c._client.params)
 
-        auth = asyncio.get_event_loop().run_until_complete(run())
+        params = asyncio.get_event_loop().run_until_complete(run())
 
-    assert auth is not None
+    assert params["consumer_key"] == "ck_test"
+    assert params["consumer_secret"] == "cs_test"
 
 
 def test_client_has_no_oauth_sign():

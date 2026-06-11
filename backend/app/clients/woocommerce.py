@@ -27,10 +27,14 @@ class WooCommerceClient:
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "WooCommerceClient":
-        # Basic Auth over HTTPS — simpler and correct for SSL endpoints
+        # Credenciales como query params: LiteSpeed (Hostinger) descarta el
+        # header Authorization antes de llegar a PHP, así que Basic Auth da 401
         self._client = httpx.AsyncClient(
             timeout=settings.WC_TIMEOUT,
-            auth=(settings.WC_CONSUMER_KEY, settings.WC_CONSUMER_SECRET),
+            params={
+                "consumer_key": settings.WC_CONSUMER_KEY,
+                "consumer_secret": settings.WC_CONSUMER_SECRET,
+            },
             follow_redirects=True,
         )
         return self

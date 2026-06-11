@@ -22,21 +22,25 @@ class WCClientError(Exception):
         super().__init__(message)
 
 
+def _build_http_client() -> httpx.AsyncClient:
+    # Credenciales como query params: LiteSpeed (Hostinger) descarta el
+    # header Authorization antes de llegar a PHP, así que Basic Auth da 401
+    return httpx.AsyncClient(
+        timeout=settings.WC_TIMEOUT,
+        params={
+            "consumer_key": settings.WC_CONSUMER_KEY,
+            "consumer_secret": settings.WC_CONSUMER_SECRET,
+        },
+        follow_redirects=True,
+    )
+
+
 class WooCommerceClient:
     def __init__(self):
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "WooCommerceClient":
-        # Credenciales como query params: LiteSpeed (Hostinger) descarta el
-        # header Authorization antes de llegar a PHP, así que Basic Auth da 401
-        self._client = httpx.AsyncClient(
-            timeout=settings.WC_TIMEOUT,
-            params={
-                "consumer_key": settings.WC_CONSUMER_KEY,
-                "consumer_secret": settings.WC_CONSUMER_SECRET,
-            },
-            follow_redirects=True,
-        )
+        self._client = _build_http_client()
         return self
 
     async def __aexit__(self, *args) -> None:
@@ -73,5 +77,5 @@ async def get_wc_client() -> WooCommerceClient:
     global _wc_client
     if _wc_client is None or _wc_client._client is None:
         _wc_client = WooCommerceClient()
-        _wc_client._client = httpx.AsyncClient(timeout=settings.WC_TIMEOUT)
+        _wc_client._client = _build_http_client()
     return _wc_client

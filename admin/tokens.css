@@ -1,0 +1,40 @@
+/**
+ * GENERADO desde tienda-magica/wp-content/mu-plugins/design-system.css
+ * Fuente autoritativa: design-system.css (Constitution I) — NO editar valores aquí.
+ * Justificación de la copia: specs/012-admin-panel/plan.md → Complexity Tracking.
+ */
+
+:root {
+  --color-primary:      #7C3AED;
+  --color-primary-dark: #5B21B6;
+  --color-cta:          #F97316;
+  --color-cta-dark:     #EA580C;
+  --color-accent:       #EC4899;
+  --color-bg:           #FFFFFF;
+  --color-surface:      #F8F5FF;
+  --color-surface-2:    #FFF7ED;
+  --color-text:         #1E1B4B;
+  --color-text-muted:   #64748B;
+  --color-border:       #E8E0FA;
+  --color-success:      #059669;
+  --color-success-dark: #047857;
+  --color-dark:         #1E1B4B;
+  --color-light:        #FFFFFF;
+  --color-gold:         #FBBF24;
+  --color-warn-text:    #B91C1C;
+
+  --font-heading: 'Rubik', sans-serif;
+  --font-body:    'Nunito Sans', sans-serif;
+
+  --space-xs:  8px;
+  --space-sm:  16px;
+  --space-md:  24px;
+  --space-lg:  40px;
+  --space-xl:  64px;
+
+  --radius-card:  16px;
+  --radius-input:  8px;
+  --shadow-card:       0 4px 16px rgba(124, 58, 237, 0.06);
+  --shadow-card-hover: 0 12px 32px rgba(124, 58, 237, 0.12);
+  --shadow-focus:      0 0 0 3px rgba(124, 58, 237, 0.12);
+}

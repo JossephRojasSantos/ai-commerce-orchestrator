@@ -504,7 +504,7 @@
       if (!location.hash.includes('whatsapp')) { clearInterval(waPollTimer); return; }
       await loadWaList();
       if (waOpenPhone) await openWaThread(waOpenPhone, true);
-    }, 30000);
+    }, 10000);
   }
 
   async function loadWaList() {
@@ -535,11 +535,21 @@
     }
   }
 
+  let waLastRender = '';
+
   async function openWaThread(phone, silent = false) {
     waOpenPhone = phone;
     if (!silent) $('wa-thread').innerHTML = 'Cargando…';
     try {
       const t = await apiFetch('/wa/conversations/' + phone);
+
+      // Poll silencioso: si nada cambió, no re-renderizar (sin parpadeo);
+      // si cambió, preservar el borrador del composer antes de redibujar.
+      const fingerprint = phone + '|' + t.mode + '|' + t.messages.length + '|' + t.window_open;
+      if (silent && fingerprint === waLastRender) return;
+      waLastRender = fingerprint;
+      const draft = $('wa-text') ? $('wa-text').value : '';
+
       const authorLabel = { customer: '', bot: '🤖 ', admin: '🙋 ' };
       $('wa-thread').innerHTML = `
         <div class="wa-thread-head">
@@ -567,6 +577,7 @@
         }`;
       const msgs = $('wa-msgs');
       if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      if (draft && $('wa-text')) $('wa-text').value = draft;
 
       const resume = $('wa-resume');
       if (resume)

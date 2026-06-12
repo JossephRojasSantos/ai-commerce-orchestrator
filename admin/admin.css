@@ -1,6 +1,8 @@
 /* Panel admin — Feature 012. Solo tokens (Constitution I). */
 
 * { box-sizing: border-box; }
+/* [hidden] debe ganar sobre las reglas de display por id */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font-family: var(--font-body);

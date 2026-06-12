@@ -65,6 +65,22 @@ jobs:
           source: "infra/docker-compose.prod.yml,infra/docker/prometheus.yml"
           target: ${{ secrets.DEPLOY_PATH }}
 
+      - name: Cache-bust admin SPA assets
+        run: |
+          HASH=$(git rev-parse --short HEAD)
+          sed -i "s/tokens.css/tokens.css?v=$HASH/; s/admin.css/admin.css?v=$HASH/; s/admin.js/admin.js?v=$HASH/" admin/index.html
+
+      - name: Deploy admin panel (SPA)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: "admin/index.html,admin/tokens.css,admin/admin.css,admin/admin.js"
+          target: /var/www/tm-admin
+          strip_components: 1
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:

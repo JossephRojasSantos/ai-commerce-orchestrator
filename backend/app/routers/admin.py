@@ -280,6 +280,85 @@ async def update_product(
         raise HTTPException(status_code=502, detail="store_unavailable") from None
 
 
+# ── Consumo IA (feature 013, US1) ───────────────────────────
+
+
+@router.get("/ai/usage")
+async def ai_usage_summary(
+    period: Literal["today", "7d", "30d"] = Query("7d"),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.services.admin import ai_usage as ai_usage_svc
+
+    return await ai_usage_svc.get_usage_summary(period)
+
+
+# ── Bandeja WhatsApp (feature 013, US2/US3) ──────────────────
+
+
+class WaReplyRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+@router.get("/wa/conversations")
+async def wa_conversations(_: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    return {"items": await wa_inbox.list_conversations()}
+
+
+@router.get("/wa/conversations/{phone}")
+async def wa_thread(phone: str, _: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    thread = await wa_inbox.get_thread(phone)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    return thread
+
+
+@router.post("/wa/conversations/{phone}/reply")
+async def wa_reply(
+    phone: str,
+    req: WaReplyRequest,
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.integrations.whatsapp.client import send_text_message
+    from app.services import wa_inbox
+
+    thread = await wa_inbox.get_thread(phone)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    if not thread["window_open"]:
+        raise HTTPException(status_code=409, detail="window_closed") from None
+
+    result = await send_text_message(wa_inbox.normalize_phone(phone), req.text)
+    delivered = result.status == "sent"
+    await wa_inbox.record_outgoing(phone, req.text, author="admin", delivered=delivered)
+
+    if not delivered:
+        raise HTTPException(status_code=502, detail="whatsapp_send_failed") from None
+
+    conv = await wa_inbox.set_mode(phone, "human")
+    logger.info("admin.wa_reply_sent", phone=phone)
+    return {
+        "ok": True,
+        "mode": "human",
+        "human_until": conv.human_until.isoformat() if conv and conv.human_until else None,
+    }
+
+
+@router.post("/wa/conversations/{phone}/resume-bot")
+async def wa_resume_bot(phone: str, _: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    conv = await wa_inbox.set_mode(phone, "bot")
+    if conv is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    logger.info("admin.wa_bot_resumed", phone=phone)
+    return {"ok": True, "mode": "bot"}
+
+
 # ── Métricas IA (US5) ────────────────────────────────────────
 
 

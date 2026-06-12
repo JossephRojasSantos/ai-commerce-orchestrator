@@ -451,6 +451,13 @@
               (usage.unestimated_calls ? `<p><small>⚠️ ${usage.unestimated_calls} llamadas sin precio configurado (no estimadas)</small></p>` : '')
             : emptyState('Sin consumo de IA en el período')
         }</div>
+        <div class="card"><h2>Consumo por canal</h2>${bars(
+          (usage.by_channel || []).map((c) => [
+            c.channel === 'whatsapp' ? '💬 WhatsApp' : c.channel === 'web' ? '💻 Chat web' : c.channel,
+            c.tokens,
+          ]),
+          (usage.by_channel || []).reduce((a, c) => a + c.tokens, 0)
+        )}</div>
         <div class="card"><h2>Intenciones</h2>${bars(
           Object.entries(metrics.intents).map(([k, v]) => [intentLabels[k] || k, v]),
           intentTotal

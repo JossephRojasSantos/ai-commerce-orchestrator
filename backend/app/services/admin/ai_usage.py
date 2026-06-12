@@ -101,6 +101,18 @@ async def get_usage_summary(period: str) -> dict:
             )
         ).scalar() or 0
 
+        channel_rows = (
+            await db.execute(
+                select(
+                    AiUsage.channel,
+                    func.coalesce(func.sum(AiUsage.prompt_tokens + AiUsage.completion_tokens), 0),
+                    func.sum(AiUsage.cost_usd),
+                )
+                .where(AiUsage.created_at >= start)
+                .group_by(AiUsage.channel)
+            )
+        ).all()
+
     by_model = []
     total_prompt = total_completion = unestimated = 0
     total_cost = 0.0
@@ -120,6 +132,16 @@ async def get_usage_summary(period: str) -> dict:
         )
     by_model.sort(key=lambda m: m["cost_usd"], reverse=True)
 
+    by_channel = [
+        {
+            "channel": ch or "otro",
+            "tokens": int(tok),
+            "cost_usd": round(float(cost), 4) if cost is not None else 0.0,
+        }
+        for ch, tok, cost in channel_rows
+    ]
+    by_channel.sort(key=lambda c: c["tokens"], reverse=True)
+
     return {
         "period": period,
         "total_tokens": total_prompt + total_completion,
@@ -128,6 +150,7 @@ async def get_usage_summary(period: str) -> dict:
         "cost_usd": round(total_cost, 4),
         "unestimated_calls": unestimated,
         "by_model": by_model,
+        "by_channel": by_channel,
         "conversations": conversations,
         "avg_cost_per_conversation": round(total_cost / conversations, 4) if conversations else 0,
     }

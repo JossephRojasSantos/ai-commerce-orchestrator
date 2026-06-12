@@ -40,10 +40,24 @@
     return data;
   }
 
+  let mfaToken = '';
+
   function showLogin() {
     $('app-view').setAttribute('hidden', '');
+    $('mfa-view').setAttribute('hidden', '');
     $('login-view').removeAttribute('hidden');
     $('login-password').focus();
+  }
+
+  function showMfa(whatsappAvailable) {
+    $('login-view').setAttribute('hidden', '');
+    $('app-view').setAttribute('hidden', '');
+    $('mfa-view').removeAttribute('hidden');
+    $('mfa-error').textContent = '';
+    $('mfa-wa-msg').textContent = '';
+    $('mfa-code').value = '';
+    $('mfa-wa-btn').style.display = whatsappAvailable ? '' : 'none';
+    $('mfa-code').focus();
   }
 
   function showApp() {
@@ -74,11 +88,61 @@
             : 'Contraseña incorrecta';
         return;
       }
-      sessionStorage.setItem('tm_admin_token', data.token);
       $('login-password').value = '';
+      if (data.mfa_required) {
+        mfaToken = data.mfa_token;
+        showMfa(data.whatsapp_available);
+        return;
+      }
+      sessionStorage.setItem('tm_admin_token', data.token);
       showApp();
     } catch {
       $('login-error').textContent = 'Error de conexión';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function doMfaVerify(e) {
+    e.preventDefault();
+    const btn = $('mfa-submit');
+    btn.disabled = true;
+    $('mfa-error').textContent = '';
+    try {
+      const resp = await fetch(API + '/login/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfa_token: mfaToken, code: $('mfa-code').value.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        $('mfa-error').textContent = 'Código incorrecto o expirado';
+        return;
+      }
+      sessionStorage.setItem('tm_admin_token', data.token);
+      showApp();
+    } catch {
+      $('mfa-error').textContent = 'Error de conexión';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function doMfaWhatsApp() {
+    const btn = $('mfa-wa-btn');
+    btn.disabled = true;
+    $('mfa-wa-msg').textContent = 'Enviando…';
+    try {
+      const resp = await fetch(API + '/login/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfa_token: mfaToken }),
+      });
+      $('mfa-wa-msg').textContent = resp.ok
+        ? '✅ Código enviado a tu WhatsApp'
+        : 'No se pudo enviar el código';
+    } catch {
+      $('mfa-wa-msg').textContent = 'Error de conexión';
     } finally {
       btn.disabled = false;
     }
@@ -411,6 +475,8 @@
   /* ── Init ── */
   document.addEventListener('DOMContentLoaded', async () => {
     $('login-form').addEventListener('submit', doLogin);
+    $('mfa-form').addEventListener('submit', doMfaVerify);
+    $('mfa-wa-btn').addEventListener('click', doMfaWhatsApp);
     $('logout-btn').addEventListener('click', async () => {
       try { await apiFetch('/logout', { method: 'POST' }); } catch { /* sesión ya inválida */ }
       sessionStorage.removeItem('tm_admin_token');

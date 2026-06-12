@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     ADMIN_SESSION_TTL: int = 28800  # 8h, deslizante
     ADMIN_SHIPPING_COST_ESTIMATE: int = 12000  # flete estimado COP para margen Dropi
 
+    # MFA del panel (TOTP + respaldo WhatsApp)
+    ADMIN_TOTP_SECRET: str = ""  # base32; si vacío, MFA deshabilitado (no enrolado)
+    ADMIN_PHONE: str = ""  # E.164 sin '+' (ej. 573166235026) para el código de respaldo
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

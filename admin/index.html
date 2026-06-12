@@ -24,6 +24,20 @@
   </form>
 </div>
 
+<!-- ── MFA (2º factor) ── -->
+<div id="mfa-view" hidden>
+  <form id="mfa-form" autocomplete="off">
+    <h1>🔐 Verificación</h1>
+    <p class="login-sub">Ingresa el código de tu app autenticadora</p>
+    <label for="mfa-code">Código de 6 dígitos</label>
+    <input type="text" id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+    <p id="mfa-error" class="error" aria-live="assertive"></p>
+    <button type="submit" class="btn-cta" id="mfa-submit">Verificar</button>
+    <button type="button" class="btn-ghost" id="mfa-wa-btn" style="width:100%;margin-top:8px">📲 Enviar código por WhatsApp</button>
+    <p id="mfa-wa-msg" class="login-sub" aria-live="polite"></p>
+  </form>
+</div>
+
 <!-- ── Shell ── -->
 <div id="app-view" hidden>
   <header id="topbar">

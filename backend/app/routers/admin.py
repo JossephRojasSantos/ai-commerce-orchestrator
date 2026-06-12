@@ -15,11 +15,15 @@ from sqlalchemy import desc, func, select
 from app.clients.woocommerce import WCClientError, WCServerError, get_wc_client
 from app.core.admin_auth import (
     check_login_blocked,
+    create_mfa_challenge,
     create_session,
     destroy_session,
+    mfa_enabled,
     register_login_failure,
     require_admin_session,
+    send_whatsapp_code,
     verify_password,
+    verify_second_factor,
 )
 from app.services.admin import customers as customers_svc
 from app.services.admin import products_admin
@@ -43,6 +47,15 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
 
+class MfaVerifyRequest(BaseModel):
+    mfa_token: str = Field(min_length=1, max_length=200)
+    code: str = Field(min_length=4, max_length=10)
+
+
+class MfaSendRequest(BaseModel):
+    mfa_token: str = Field(min_length=1, max_length=200)
+
+
 @router.post("/login")
 async def login(req: LoginRequest, request: Request) -> dict:
     ip = _client_ip(request)
@@ -53,9 +66,40 @@ async def login(req: LoginRequest, request: Request) -> dict:
         await register_login_failure(ip)
         raise HTTPException(status_code=401, detail="unauthorized") from None
 
-    token = await create_session(ip)
     from app.config import settings
 
+    # Primer factor OK. Si hay MFA configurado, exigir 2º factor.
+    if mfa_enabled():
+        mfa_token = await create_mfa_challenge(ip)
+        from app.config import settings as s
+
+        return {
+            "mfa_required": True,
+            "mfa_token": mfa_token,
+            "whatsapp_available": bool(s.ADMIN_PHONE),
+        }
+
+    token = await create_session(ip)
+    return {"token": token, "expires_in": settings.ADMIN_SESSION_TTL}
+
+
+@router.post("/login/whatsapp")
+async def login_whatsapp(req: MfaSendRequest) -> dict:
+    """Respaldo: envía el código del 2º factor por WhatsApp al admin."""
+    sent = await send_whatsapp_code(req.mfa_token)
+    if not sent:
+        raise HTTPException(status_code=400, detail="whatsapp_unavailable") from None
+    return {"sent": True}
+
+
+@router.post("/login/verify")
+async def login_verify(req: MfaVerifyRequest) -> dict:
+    """Valida TOTP o código WhatsApp y emite la sesión."""
+    from app.config import settings
+
+    token = await verify_second_factor(req.mfa_token, req.code)
+    if token is None:
+        raise HTTPException(status_code=401, detail="invalid_code") from None
     return {"token": token, "expires_in": settings.ADMIN_SESSION_TTL}
 
 

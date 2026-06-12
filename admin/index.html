@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel — Tienda Mágica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="login-view" hidden>
+  <form id="login-form" autocomplete="off">
+    <h1>✨ Tienda Mágica</h1>
+    <p class="login-sub">Panel de administración</p>
+    <label for="login-password">Contraseña</label>
+    <input type="password" id="login-password" autocomplete="current-password" required>
+    <p id="login-error" class="error" aria-live="assertive"></p>
+    <button type="submit" class="btn-cta" id="login-submit">Entrar</button>
+  </form>
+</div>
+
+<!-- ── Shell ── -->
+<div id="app-view" hidden>
+  <header id="topbar">
+    <span class="brand">✨ Tienda Mágica · Panel</span>
+    <button type="button" id="logout-btn" class="btn-ghost">Salir</button>
+  </header>
+
+  <nav id="sidenav" aria-label="Secciones">
+    <a href="#/dashboard" data-nav="dashboard">📊 Dashboard</a>
+    <a href="#/orders" data-nav="orders">📦 Pedidos</a>
+    <a href="#/customers" data-nav="customers">👥 Clientes</a>
+    <a href="#/products" data-nav="products">🏷️ Productos</a>
+    <a href="#/ai" data-nav="ai">🪄 Asistente IA</a>
+  </nav>
+
+  <main id="content" aria-live="polite"></main>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

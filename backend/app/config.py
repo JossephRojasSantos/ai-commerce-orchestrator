@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     ALLOWED_API_KEYS: list[str] = []
     IP_RATE_LIMIT_PER_MIN: int = 60
 
+    # Admin panel (feature 012)
+    ADMIN_PASSWORD_HASH: str = ""
+    ADMIN_PASSWORD_SALT: str = ""
+    ADMIN_SESSION_TTL: int = 28800  # 8h, deslizante
+    ADMIN_SHIPPING_COST_ESTIMATE: int = 12000  # flete estimado COP para margen Dropi
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

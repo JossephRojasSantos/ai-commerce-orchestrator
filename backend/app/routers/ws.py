@@ -16,6 +16,41 @@ router = APIRouter(tags=["websocket"])
 _WELCOME = "¡Hola! Soy el asistente de Tienda Mágica. ¿En qué te puedo ayudar hoy?"
 
 
+async def _persist_exchange(
+    session_id: str, user_text: str, reply: str, intent: str, agent: str
+) -> None:
+    """Guarda el par usuario/asistente en las tablas de chat (feature 012, research R5).
+
+    Best-effort: un fallo de DB no debe romper la conversación en vivo.
+    """
+    try:
+        from sqlalchemy import select
+
+        from app.db.base import AsyncSessionLocal
+        from app.models.conversation import Conversation, Message
+
+        async with AsyncSessionLocal() as db:
+            sid = uuid.UUID(session_id)
+            result = await db.execute(select(Conversation).where(Conversation.session_id == sid))
+            conv = result.scalar_one_or_none()
+            if conv is None:
+                conv = Conversation(session_id=sid)
+                db.add(conv)
+                await db.flush()
+            db.add(Message(conversation_id=conv.id, role="user", content=user_text))
+            db.add(
+                Message(
+                    conversation_id=conv.id,
+                    role="assistant",
+                    content=reply,
+                    metadata_={"intent": intent, "agent": agent},
+                )
+            )
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("ws_persist_failed", error=str(exc), session_id=session_id)
+
+
 def _auth_ok(api_key: str) -> bool:
     if not settings.ALLOWED_API_KEYS:
         # Fail-closed en producción: sin keys configuradas nadie entra
@@ -64,6 +99,8 @@ async def ws_chat(
 
             await websocket.send_text(json.dumps({"type": "typing"}))
 
+            intent = ""
+            agent = ""
             try:
                 result = await process_message(
                     channel="web",
@@ -73,6 +110,8 @@ async def ws_chat(
                     metadata={"session_id": session_id},
                 )
                 reply = result.get("reply", "")
+                intent = result.get("intent", "")
+                agent = result.get("agent", "")
             except Exception as exc:
                 logger.error("ws_chat_error", error=str(exc), session_id=session_id)
                 reply = "Lo siento, ocurrió un error. Por favor intenta de nuevo."
@@ -80,11 +119,9 @@ async def ws_chat(
             await websocket.send_text(json.dumps({"type": "typing_stop"}))
             await websocket.send_text(json.dumps({"type": "text", "content": reply}))
 
-            logger.info(
-                "ws_chat_replied",
-                session_id=session_id,
-                intent=result.get("intent", "") if "result" in dir() else "",
-            )
+            await _persist_exchange(session_id, text, reply, intent, agent)
+
+            logger.info("ws_chat_replied", session_id=session_id, intent=intent)
 
     except WebSocketDisconnect:
         logger.info("ws_chat_disconnected", session_id=session_id)

@@ -69,6 +69,73 @@ class WooCommerceClient:
             raise WCClientError(resp.status_code, resp.text)
         return resp.json()
 
+    async def _get_with_headers(self, path: str, params: dict | None = None) -> tuple[list, dict]:
+        """Como _get pero devuelve también headers (X-WP-Total para paginación)."""
+        url = f"{settings.WC_BASE_URL}{path}"
+        resp = await self._client.get(url, params=params or {})
+        if resp.status_code >= 500:
+            raise WCServerError(resp.status_code, resp.text)
+        if resp.status_code >= 400:
+            raise WCClientError(resp.status_code, resp.text)
+        return resp.json(), dict(resp.headers)
+
+    async def _put(self, path: str, payload: dict) -> dict:
+        url = f"{settings.WC_BASE_URL}{path}"
+        start = time.monotonic()
+        resp = await self._client.put(url, json=payload)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.info(
+            "wc_request",
+            wc_endpoint=path,
+            method="PUT",
+            status=resp.status_code,
+            latency_ms=latency_ms,
+        )
+        if resp.status_code >= 500:
+            raise WCServerError(resp.status_code, resp.text)
+        if resp.status_code >= 400:
+            raise WCClientError(resp.status_code, resp.text)
+        return resp.json()
+
+    # ── Métodos admin (feature 012) ──────────────────────────
+
+    async def list_orders(
+        self,
+        status: str | None = None,
+        after: str | None = None,
+        before: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list, int]:
+        params: dict = {"page": page, "per_page": per_page, "orderby": "date", "order": "desc"}
+        if status:
+            params["status"] = status
+        if after:
+            params["after"] = after
+        if before:
+            params["before"] = before
+        if search:
+            params["search"] = search
+        data, headers = await self._get_with_headers("/orders", params)
+        total = int(headers.get("x-wp-total", len(data)))
+        return data, total
+
+    async def get_order_raw(self, order_id: int) -> dict:
+        return await self._get(f"/orders/{order_id}")
+
+    async def get_order_notes(self, order_id: int) -> list:
+        return await self._get(f"/orders/{order_id}/notes")
+
+    async def update_order(self, order_id: int, payload: dict) -> dict:
+        return await self._put(f"/orders/{order_id}", payload)
+
+    async def list_products_raw(self, per_page: int = 100) -> list:
+        return await self._get("/products", {"per_page": per_page, "status": "any"})
+
+    async def update_product(self, product_id: int, payload: dict) -> dict:
+        return await self._put(f"/products/{product_id}", payload)
+
 
 _wc_client: WooCommerceClient | None = None
 

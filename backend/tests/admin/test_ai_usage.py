@@ -19,6 +19,12 @@ def test_estimate_cost_unknown_model_returns_none():
     assert estimate_cost("desconocido/modelo-x", 1000, 1000) is None
 
 
+def test_estimate_cost_without_provider_prefix():
+    # OpenRouter a veces devuelve el modelo sin el prefijo del provider
+    cost = estimate_cost("gpt-4o-mini-2024-07-18", 1_000_000, 0)
+    assert cost == pytest.approx(0.15)
+
+
 @pytest.mark.asyncio
 async def test_record_usage_swallows_db_errors():
     with patch("app.db.base.AsyncSessionLocal", side_effect=RuntimeError("db down")):

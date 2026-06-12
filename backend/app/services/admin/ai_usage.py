@@ -23,9 +23,15 @@ def _prices() -> dict[str, tuple[float, float]]:
 
 
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float | None:
-    """USD según tabla de precios; None si el modelo no está (→ 'no estimado')."""
+    """USD según tabla de precios; None si el modelo no está (→ 'no estimado').
+
+    OpenRouter devuelve el modelo a veces con prefijo de provider
+    ("openai/gpt-4o-mini") y a veces sin él ("gpt-4o-mini-2024-07-18"):
+    se matchea contra ambas formas.
+    """
     for prefix, (p_in, p_out) in _prices().items():
-        if model.startswith(prefix):
+        bare = prefix.split("/")[-1]
+        if model.startswith(prefix) or model.startswith(bare):
             return prompt_tokens / 1e6 * p_in + completion_tokens / 1e6 * p_out
     return None
 

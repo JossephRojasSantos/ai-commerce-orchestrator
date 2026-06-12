@@ -29,3 +29,8 @@ async def cache_get(key: str) -> dict | list | None:
 async def cache_set(key: str, value: dict | list, ttl: int) -> None:
     r = get_redis()
     await r.set(key, orjson.dumps(value), ex=ttl)
+
+
+async def cache_delete(key: str) -> None:
+    r = get_redis()
+    await r.delete(key)

@@ -81,6 +81,16 @@ class Settings(BaseSettings):
     ADMIN_TOTP_SECRET: str = ""  # base32; si vacío, MFA deshabilitado (no enrolado)
     ADMIN_PHONE: str = ""  # E.164 sin '+' (ej. 573166235026) para el código de respaldo
 
+    # Observabilidad IA + bandeja WhatsApp (feature 013)
+    # USD por millón de tokens {modelo: [input, output]}; matching por prefijo.
+    AI_MODEL_PRICES: str = (
+        '{"openai/gpt-4o-mini": [0.15, 0.60],'
+        ' "google/gemini-2.0-flash": [0.10, 0.40],'
+        ' "anthropic/claude-haiku-4-5": [1.00, 5.00],'
+        ' "meta-llama/llama-3.1-8b-instruct": [0.02, 0.03]}'
+    )
+    WA_HUMAN_PAUSE_HOURS: int = 12  # pausa del bot tras respuesta manual
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

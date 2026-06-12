@@ -224,3 +224,48 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ── Bandeja WhatsApp (feature 013) ── */
+.wa-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-sm);
+  align-items: start;
+}
+#wa-list { max-height: 75vh; overflow-y: auto; padding: var(--space-xs); }
+.wa-item {
+  padding: var(--space-xs);
+  border-radius: var(--radius-input);
+  border-bottom: 1px solid var(--color-border);
+}
+.wa-item:hover, .wa-item.active { background: var(--color-surface); }
+.wa-item-top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-xs); }
+.wa-time { color: var(--color-text-muted); }
+
+.wa-thread-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-xs);
+}
+.wa-msgs { max-height: 55vh; overflow-y: auto; padding: var(--space-xs) 0; }
+#wa-compose { display: flex; gap: var(--space-xs); align-items: flex-end; margin-top: var(--space-xs); }
+#wa-compose textarea {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  padding: var(--space-xs);
+  resize: vertical;
+}
+#wa-compose textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+
+@media (max-width: 860px) {
+  .wa-layout { grid-template-columns: 1fr; }
+  #wa-list { max-height: 30vh; }
+}

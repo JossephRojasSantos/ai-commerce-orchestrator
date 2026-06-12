@@ -7,6 +7,7 @@ import structlog
 
 from app.core.cache import get_redis
 from app.integrations.whatsapp.client import send_text_message
+from app.services import wa_inbox
 from app.services.orchestrator.graph import process_message
 
 logger = structlog.get_logger()
@@ -18,6 +19,7 @@ _BLPOP_TIMEOUT = 5
 async def _handle(message: dict) -> None:
     phone: str = message.get("from", "")
     msg_type: str = message.get("type", "")
+    profile_name: str = message.get("profile_name", "")
 
     if msg_type == "text":
         text: str = message.get("text", {}).get("body", "")
@@ -25,9 +27,24 @@ async def _handle(message: dict) -> None:
         text = message.get("button", {}).get("text", "")
     else:
         logger.info("wa.consumer.unsupported_type", msg_type=msg_type, phone=phone)
+        # Persistir placeholder para que el hilo no pierda contexto (feature 013)
+        if phone:
+            with contextlib.suppress(Exception):
+                await wa_inbox.record_incoming(phone, "", name=profile_name or None)
         return
 
     if not phone or not text:
+        return
+
+    # Persistir el entrante y decidir si el bot responde (modo humano — FR-011)
+    bot_should_reply = True
+    try:
+        bot_should_reply = await wa_inbox.record_incoming(phone, text, name=profile_name or None)
+    except Exception as exc:  # noqa: BLE001 — la persistencia no bloquea al bot
+        logger.warning("wa.consumer.persist_failed", phone=phone, error=str(exc))
+
+    if not bot_should_reply:
+        logger.info("wa.consumer.human_mode_skip", phone=phone)
         return
 
     trace_id = str(uuid.uuid4())
@@ -39,6 +56,8 @@ async def _handle(message: dict) -> None:
             trace_id=trace_id,
         )
         await send_text_message(phone=phone, text=result["reply"])
+        with contextlib.suppress(Exception):
+            await wa_inbox.record_outgoing(phone, result["reply"], author="bot")
         logger.info(
             "wa.consumer.replied",
             phone=phone,

@@ -407,20 +407,50 @@
   }
 
   /* ── Vista: IA ── */
+  const fmtUSD = (n) => '$' + Number(n).toFixed(n >= 1 ? 2 : 4) + ' USD';
+
   async function viewAI() {
+    const period = sessionStorage.getItem('tm_admin_ai_period') || '7d';
     content().innerHTML = '<div id="ai-body">Cargando…</div>';
     try {
-      const [metrics, convs] = await Promise.all([
+      const [metrics, convs, usage] = await Promise.all([
         apiFetch('/ai/metrics'),
         apiFetch('/ai/conversations?limit=20'),
+        apiFetch(`/ai/usage?period=${period}`),
       ]);
       const intentTotal = Object.values(metrics.intents).reduce((a, b) => a + b, 0);
       const intentLabels = { buy: '🛒 Compra', recommend: '✨ Recomendación', track: '📦 Rastreo', chat: '💬 Conversación', other: '❓ Otro' };
+      const maxModelCost = Math.max(...usage.by_model.map((m) => m.cost_usd), 0.0001);
       $('ai-body').innerHTML = `
+        <div class="toolbar">
+          <select id="ai-period-sel" aria-label="Período de consumo">
+            <option value="today">Hoy</option>
+            <option value="7d">Últimos 7 días</option>
+            <option value="30d">Últimos 30 días</option>
+          </select>
+        </div>
         <div class="metric-grid">
+          <div class="metric"><div class="value">${usage.total_tokens.toLocaleString('es-CO')}</div><div class="label">Tokens (${period})</div></div>
+          <div class="metric profit"><div class="value">${fmtUSD(usage.cost_usd)}</div><div class="label">Costo estimado</div></div>
+          <div class="metric"><div class="value">${fmtUSD(usage.avg_cost_per_conversation)}</div><div class="label">Costo / conversación</div></div>
           <div class="metric"><div class="value">${metrics.conversations}</div><div class="label">Conversaciones</div></div>
           <div class="metric"><div class="value">${metrics.messages}</div><div class="label">Mensajes</div></div>
         </div>
+        <div class="card"><h2>Consumo por modelo</h2>${
+          usage.by_model.length
+            ? usage.by_model
+                .map(
+                  (m) => `
+            <div class="bar-row">
+              <span class="bar-label" title="${esc(m.model)}">${esc(m.model.split('/').pop())}</span>
+              <div class="bar-track"><div class="bar-fill cta" style="width:${Math.round((m.cost_usd / maxModelCost) * 100)}%"></div></div>
+              <span class="bar-num">${fmtUSD(m.cost_usd)} · ${m.tokens.toLocaleString('es-CO')} tk</span>
+            </div>`
+                )
+                .join('') +
+              (usage.unestimated_calls ? `<p><small>⚠️ ${usage.unestimated_calls} llamadas sin precio configurado (no estimadas)</small></p>` : '')
+            : emptyState('Sin consumo de IA en el período')
+        }</div>
         <div class="card"><h2>Intenciones</h2>${bars(
           Object.entries(metrics.intents).map(([k, v]) => [intentLabels[k] || k, v]),
           intentTotal
@@ -448,8 +478,129 @@
               .join('');
         })
       );
+      $('ai-period-sel').value = period;
+      $('ai-period-sel').addEventListener('change', (e) => {
+        sessionStorage.setItem('tm_admin_ai_period', e.target.value);
+        viewAI();
+      });
     } catch (e) {
       if (e.message !== 'session') $('ai-body').innerHTML = errCard('No pudimos cargar las métricas del asistente');
+    }
+  }
+
+  /* ── Vista: WhatsApp (feature 013) ── */
+  let waPollTimer = null;
+  let waOpenPhone = null;
+
+  async function viewWhatsApp() {
+    clearInterval(waPollTimer);
+    content().innerHTML = `
+      <div class="wa-layout">
+        <div id="wa-list" class="card">Cargando…</div>
+        <div id="wa-thread" class="card"><div class="empty">Elige una conversación</div></div>
+      </div>`;
+    await loadWaList();
+    waPollTimer = setInterval(async () => {
+      if (!location.hash.includes('whatsapp')) { clearInterval(waPollTimer); return; }
+      await loadWaList();
+      if (waOpenPhone) await openWaThread(waOpenPhone, true);
+    }, 30000);
+  }
+
+  async function loadWaList() {
+    try {
+      const data = await apiFetch('/wa/conversations');
+      if (!data.items.length) {
+        $('wa-list').innerHTML = emptyState('Aún no hay conversaciones de WhatsApp');
+        return;
+      }
+      $('wa-list').innerHTML = data.items
+        .map(
+          (c) => `
+        <div class="wa-item clickable ${c.phone === waOpenPhone ? 'active' : ''}" data-wa="${esc(c.phone)}" tabindex="0" role="button">
+          <div class="wa-item-top">
+            <strong>${esc(c.name || c.phone)}</strong>
+            <span class="badge ${c.mode === 'human' ? 'alert' : 'ok'}">${c.mode === 'human' ? '🙋 humano' : '🤖 bot'}</span>
+          </div>
+          <small>${esc(c.last_author === 'customer' ? '' : c.last_author + ': ')}${esc(c.last_message)}</small><br>
+          <small class="wa-time">${fmtDate(c.last_activity)}</small>
+        </div>`
+        )
+        .join('');
+      document.querySelectorAll('[data-wa]').forEach((el) =>
+        el.addEventListener('click', () => openWaThread(el.dataset.wa))
+      );
+    } catch (e) {
+      if (e.message !== 'session') $('wa-list').innerHTML = errCard('No pudimos cargar la bandeja');
+    }
+  }
+
+  async function openWaThread(phone, silent = false) {
+    waOpenPhone = phone;
+    if (!silent) $('wa-thread').innerHTML = 'Cargando…';
+    try {
+      const t = await apiFetch('/wa/conversations/' + phone);
+      const authorLabel = { customer: '', bot: '🤖 ', admin: '🙋 ' };
+      $('wa-thread').innerHTML = `
+        <div class="wa-thread-head">
+          <strong>${esc(t.name || t.phone)}</strong> · ${esc(t.phone)}
+          <span class="badge ${t.mode === 'human' ? 'alert' : 'ok'}">${t.mode === 'human' ? '🙋 humano' : '🤖 bot'}</span>
+          ${t.mode === 'human' ? '<button type="button" class="btn-ghost" id="wa-resume">Reanudar bot</button>' : ''}
+        </div>
+        <div class="wa-msgs" id="wa-msgs">
+          ${t.messages
+            .map(
+              (m) => `<div class="msg ${m.author === 'customer' ? 'assistant' : 'user'}">
+              ${authorLabel[m.author] || ''}${esc(m.content)}${m.delivered === false ? ' ⚠️ no entregado' : ''}
+              <br><small>${fmtDate(m.date)}</small></div>`
+            )
+            .join('')}
+        </div>
+        ${
+          t.window_open
+            ? `<form id="wa-compose">
+                <textarea id="wa-text" rows="2" placeholder="Escribe tu respuesta…" aria-label="Respuesta"></textarea>
+                <button type="submit" class="btn-cta">Enviar</button>
+              </form>
+              <p id="wa-send-msg" class="error" aria-live="polite"></p>`
+            : '<p class="empty">🔒 Ventana de 24h cerrada — no se pueden enviar mensajes libres hasta que el cliente escriba de nuevo.</p>'
+        }`;
+      const msgs = $('wa-msgs');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+
+      const resume = $('wa-resume');
+      if (resume)
+        resume.addEventListener('click', async () => {
+          await apiFetch(`/wa/conversations/${phone}/resume-bot`, { method: 'POST' });
+          openWaThread(phone);
+          loadWaList();
+        });
+
+      const form = $('wa-compose');
+      if (form)
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const text = $('wa-text').value.trim();
+          if (!text) return;
+          const btn = form.querySelector('button');
+          btn.disabled = true;
+          try {
+            await apiFetch(`/wa/conversations/${phone}/reply`, {
+              method: 'POST',
+              body: JSON.stringify({ text }),
+            });
+            openWaThread(phone);
+            loadWaList();
+          } catch (err) {
+            $('wa-send-msg').textContent =
+              err.message === 'window_closed'
+                ? 'La ventana de 24h se cerró — no se pudo enviar'
+                : 'No se pudo enviar el mensaje, reintenta';
+            btn.disabled = false;
+          }
+        });
+    } catch (e) {
+      if (e.message !== 'session') $('wa-thread').innerHTML = errCard('No pudimos cargar la conversación');
     }
   }
 
@@ -460,6 +611,7 @@
     customers: viewCustomers,
     products: viewProducts,
     ai: viewAI,
+    whatsapp: viewWhatsApp,
   };
 
   function route() {

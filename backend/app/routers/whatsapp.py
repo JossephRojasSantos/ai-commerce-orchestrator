@@ -54,6 +54,11 @@ async def receive_webhook(request: Request) -> dict:
         for change in entry.get("changes", []):
             if change.get("field") != "messages":
                 continue
+            # Nombre del contacto para la bandeja (feature 013)
+            contacts = change.get("value", {}).get("contacts", [])
+            profile_name = (
+                (contacts[0].get("profile", {}) or {}).get("name", "") if contacts else ""
+            )
             for message in change.get("value", {}).get("messages", []):
                 message_id = message.get("id")
                 if not message_id:
@@ -80,7 +85,7 @@ async def receive_webhook(request: Request) -> dict:
 
                 await redis.rpush(
                     "whatsapp:messages:incoming",
-                    json.dumps(message),
+                    json.dumps({**message, "profile_name": profile_name}),
                 )
                 logger.info("wa.webhook.enqueued", message_id=message_id)
 

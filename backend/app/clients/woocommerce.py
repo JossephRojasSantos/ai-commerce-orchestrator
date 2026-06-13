@@ -1,4 +1,5 @@
 import time
+import uuid
 
 import httpx
 import structlog
@@ -6,6 +7,16 @@ import structlog
 from app.config import settings
 
 logger = structlog.get_logger()
+
+
+def _cache_bust() -> dict:
+    """Param único para evitar que LiteSpeed (Hostinger) sirva GETs REST cacheados.
+
+    Las credenciales van como query params (LiteSpeed descarta el header Authorization),
+    así que la URL es constante y LiteSpeed la cachea → el backend leería datos viejos
+    (p. ej. metadatos de sync Dropi que no aparecían en el panel).
+    """
+    return {"_nocache": uuid.uuid4().hex}
 
 
 class WCServerError(Exception):
@@ -50,7 +61,7 @@ class WooCommerceClient:
     async def _get(self, path: str, params: dict | None = None) -> dict | list:
         params = params or {}
         url = f"{settings.WC_BASE_URL}{path}"
-        all_params = {**params}
+        all_params = {**params, **_cache_bust()}
         start = time.monotonic()
         try:
             resp = await self._client.get(url, params=all_params)
@@ -72,7 +83,7 @@ class WooCommerceClient:
     async def _get_with_headers(self, path: str, params: dict | None = None) -> tuple[list, dict]:
         """Como _get pero devuelve también headers (X-WP-Total para paginación)."""
         url = f"{settings.WC_BASE_URL}{path}"
-        resp = await self._client.get(url, params=params or {})
+        resp = await self._client.get(url, params={**(params or {}), **_cache_bust()})
         if resp.status_code >= 500:
             raise WCServerError(resp.status_code, resp.text)
         if resp.status_code >= 400:

@@ -3,7 +3,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+import respx
 from app.clients.woocommerce import WooCommerceClient
+from app.config import settings
 
 
 @pytest.fixture
@@ -43,3 +45,24 @@ async def test_context_manager_closes_client():
     async with WooCommerceClient() as c:
         assert c._client is not None
     assert c._client.is_closed
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_adds_cache_bust_param(client):
+    """Cada GET lleva un param único para esquivar el caché LiteSpeed de WC."""
+    route = respx.get(f"{settings.WC_BASE_URL}/orders/97").mock(
+        return_value=httpx.Response(200, json={"id": 97})
+    )
+    await client.get_order_raw(97)
+    assert "_nocache" in route.calls[0].request.url.params
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_orders_adds_cache_bust_param(client):
+    route = respx.get(f"{settings.WC_BASE_URL}/orders").mock(
+        return_value=httpx.Response(200, json=[], headers={"x-wp-total": "0"})
+    )
+    await client.list_orders()
+    assert "_nocache" in route.calls[0].request.url.params

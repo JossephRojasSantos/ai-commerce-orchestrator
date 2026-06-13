@@ -91,6 +91,18 @@ class Settings(BaseSettings):
     )
     WA_HUMAN_PAUSE_HOURS: int = 12  # pausa del bot tras respuesta manual
 
+    # Product Scout — catálogo Dropi (feature 014)
+    DROPI_INTEGRATION_KEY: str = ""  # token de integración; si vacío, ingesta deshabilitada
+    DROPI_API_BASE: str = "https://api.dropi.co/integrations"
+    # El WAF de Dropi rechaza UAs de CLI/librerías; UA tipo WordPress validado (research R1)
+    DROPI_USER_AGENT: str = "WordPress/6.7; https://tiendamagica.shop"
+    SCOUT_FREIGHT_COST: int = 12000  # flete estimado COP para margen
+    SCOUT_TOP_N: int = 30  # candidatos enviados al scoring IA
+    SCOUT_NOVELTY_DAYS: int = 14
+    SCOUT_NOVELTY_STOCK: int = 50
+    SCOUT_PRICE_MIN: int = 30000  # rango COD atractivo (criterio scoring)
+    SCOUT_PRICE_MAX: int = 150000
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

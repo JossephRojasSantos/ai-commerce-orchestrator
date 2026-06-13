@@ -122,12 +122,18 @@ async def compute_signals(db) -> int:
             4,
         )
 
-    stmt = _insert(db)(ScoutSignal).values(signals)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["dropi_product_id"],
-        set_={c: stmt.excluded[c] for c in signals[0] if c != "dropi_product_id"},
-    )
-    await db.execute(stmt)
+    # Insert por lotes: asyncpg limita a 32767 parámetros por query
+    # (8 columnas × ~4000 filas), así que troceamos a 2000 filas/lote.
+    cols = list(signals[0])
+    chunk = 2000
+    for i in range(0, len(signals), chunk):
+        batch = signals[i : i + chunk]
+        stmt = _insert(db)(ScoutSignal).values(batch)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["dropi_product_id"],
+            set_={c: stmt.excluded[c] for c in cols if c != "dropi_product_id"},
+        )
+        await db.execute(stmt)
     await db.commit()
     return len(signals)
 

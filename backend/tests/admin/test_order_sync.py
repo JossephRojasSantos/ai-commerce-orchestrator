@@ -45,6 +45,18 @@ async def test_list_orders_uses_wc_token_and_result_number():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_list_orders_clamps_result_number_to_100():
+    # Dropi rechaza result_number alto con 400; el cliente lo topa en 100.
+    route = respx.get(f"{settings.DROPI_API_BASE}/orders/myorders").mock(
+        return_value=httpx.Response(200, json={"isSuccess": True, "objects": []})
+    )
+    with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"):
+        await dropi.list_orders(result_number=500)
+    assert route.calls[0].request.url.params["result_number"] == "100"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_list_orders_error_raises():
     respx.get(f"{settings.DROPI_API_BASE}/orders/myorders").mock(
         return_value=httpx.Response(200, json={"isSuccess": False, "status": 401})

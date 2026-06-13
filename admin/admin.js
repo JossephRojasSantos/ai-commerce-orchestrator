@@ -725,6 +725,59 @@
     } catch (e) {
       if (e.message !== 'session') $('scout-body').innerHTML = errCard('No pudimos cargar el ranking Scout');
     }
+    loadScoutDemand();
+  }
+
+  async function loadScoutDemand() {
+    try {
+      const d = await apiFetch('/scout/demand');
+      $('scout-demand').innerHTML = `
+        <div class="card"><h2>Demanda insatisfecha
+          <button type="button" class="btn-ghost" id="scout-demand-refresh">🔄 Analizar conversaciones</button></h2>
+        <p><small>Productos que tus clientes pidieron en el chat web o WhatsApp y no están en tu catálogo.</small></p>
+        ${
+          d.terms.length
+            ? `<table class="keep-cols">
+                <thead><tr><th>Término</th><th>Menciones</th><th>Canales</th><th>Candidatos en Dropi</th></tr></thead>
+                <tbody>${d.terms
+                  .map(
+                    (t) => `<tr>
+                    <td><strong>${esc(t.term)}</strong></td>
+                    <td>${t.mention_count}</td>
+                    <td>${t.sample_channels.map((c) => (c === 'whatsapp' ? '💬' : '💻')).join(' ')}</td>
+                    <td>${
+                      t.dropi_candidates.length
+                        ? t.dropi_candidates
+                            .map(
+                              (c) =>
+                                `<a href="https://app.dropi.co/dashboard/product-details/${c.dropi_product_id}" target="_blank" rel="noopener">${esc(c.name)}</a>`
+                            )
+                            .join('<br>')
+                        : '—'
+                    }</td></tr>`
+                  )
+                  .join('')}</tbody>
+              </table>`
+            : emptyState(
+                d.analyzed_at
+                  ? 'Sin demanda insatisfecha detectada — tus clientes encuentran lo que buscan'
+                  : 'Aún sin analizar — pulsa "Analizar conversaciones"'
+              )
+        }</div>`;
+      $('scout-demand-refresh').addEventListener('click', async () => {
+        $('scout-demand-refresh').disabled = true;
+        try {
+          await apiFetch('/scout/demand/refresh', { method: 'POST' });
+          $('scout-demand-refresh').textContent = '⏳ Analizando… recarga en unos segundos';
+        } catch (e) {
+          $('scout-demand-refresh').textContent =
+            e.message === 'already_running' ? '⏳ Ya hay un análisis en curso' : 'No se pudo lanzar';
+          $('scout-demand-refresh').disabled = false;
+        }
+      });
+    } catch (e) {
+      if (e.message !== 'session') $('scout-demand').innerHTML = errCard('No pudimos cargar la demanda insatisfecha');
+    }
   }
 
   /* ── Router ── */

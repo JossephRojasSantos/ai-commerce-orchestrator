@@ -32,8 +32,32 @@ async def test_products_margin_and_no_raw_meta(admin_client, no_cache):
 
     items = {p["id"]: p for p in resp.json()["items"]}
     assert items[84]["margin"] == 9900 and items[84]["margin_alert"] is False
+    assert items[84]["price_floor"] == 40000  # costo 28000 + flete 12000 + margen mín 0
     assert items[85]["margin_alert"] is True
     assert items[70]["origin"] == "own" and items[70]["supplier_cost"] is None
+
+
+@pytest.mark.asyncio
+async def test_price_floor_with_min_margin(admin_client, no_cache):
+    """Con margen mínimo, un producto rentable pero bajo el piso se marca en alerta."""
+    from app.config import settings
+
+    products = [make_product(84, price="45000", dropi=True)]  # margen 5000 (>0 pero < mín)
+    wc = MagicMock()
+    wc.list_products_raw = AsyncMock(return_value=products)
+    with (
+        patch.object(settings, "ADMIN_MIN_MARGIN", 8000),
+        patch(
+            "app.services.admin.products_admin.get_wc_client",
+            new_callable=AsyncMock,
+            return_value=wc,
+        ),
+    ):
+        resp = await admin_client.get("/v1/admin/products", headers=ADMIN_AUTH)
+
+    p = {x["id"]: x for x in resp.json()["items"]}[84]
+    assert p["price_floor"] == 48000  # 28000 + 12000 + 8000
+    assert p["margin"] == 5000 and p["margin_alert"] is True  # 45000 < 48000
     # el meta crudo (con token Dropi) jamás sale
     body = resp.text
     assert "SECRET-JWT-NO-EXPONER" not in body

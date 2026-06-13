@@ -41,9 +41,15 @@ def _to_dto(p: dict) -> dict:
 
     margin = None
     margin_alert = False
+    price_floor = None
     if supplier_cost is not None:
         margin = price - supplier_cost - settings.ADMIN_SHIPPING_COST_ESTIMATE
-        margin_alert = margin <= 0
+        # Piso de precio = costo + flete + margen mínimo. Vender por debajo → Dropi
+        # rechaza el pedido COD ("monto a ganar ≤ 0").
+        price_floor = round(
+            supplier_cost + settings.ADMIN_SHIPPING_COST_ESTIMATE + settings.ADMIN_MIN_MARGIN
+        )
+        margin_alert = price < price_floor
 
     image = ""
     if p.get("images"):
@@ -62,6 +68,7 @@ def _to_dto(p: dict) -> dict:
         "supplier_cost": supplier_cost,
         "margin": margin,
         "margin_alert": margin_alert,
+        "price_floor": price_floor,
     }
 
 

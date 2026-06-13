@@ -354,7 +354,7 @@
     load();
   }
 
-  /* ── Vista: Productos ── */
+  /* ── Vista: Productos (lista) ── */
   async function viewProducts() {
     content().innerHTML = '<div id="prod-body">Cargando…</div>';
     try {
@@ -362,13 +362,14 @@
       if (!data.items.length) { $('prod-body').innerHTML = emptyState('Sin productos'); return; }
       $('prod-body').innerHTML = `
         <div class="card"><h2>Productos (${data.items.length})</h2>
+        <p><small>Haz clic en un producto para editar fotos y descripción. El interruptor lo muestra u oculta en la tienda al instante.</small></p>
         <table class="keep-cols">
-          <thead><tr><th></th><th>Producto</th><th>Precio</th><th>Stock</th><th>Margen</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Producto</th><th>Precio</th><th>Stock</th><th>Margen</th><th>Visible</th><th></th></tr></thead>
           <tbody>${data.items
             .map(
               (p) => `<tr data-prod="${p.id}">
               <td><img src="${esc(p.image)}" alt="" loading="lazy"></td>
-              <td>${esc(p.name)}<br><span class="badge ${p.origin}">${p.origin === 'dropi' ? 'Dropi' : 'Propio'}</span></td>
+              <td class="prod-name clickable" data-edit="${p.id}">${esc(p.name)}<br><span class="badge ${p.origin}">${p.origin === 'dropi' ? 'Dropi' : 'Propio'}</span></td>
               <td><input class="inline-edit" type="number" min="1" step="100" value="${p.price}" data-field="price" aria-label="Precio de ${esc(p.name)}"></td>
               <td><input class="inline-edit" type="number" min="0" step="1" value="${p.stock ?? ''}" data-field="stock" aria-label="Stock de ${esc(p.name)}"></td>
               <td>${
@@ -378,12 +379,33 @@
                     : `<span class="badge ok">${fmtCOP(p.margin)}</span>`
                   : '—'
               }</td>
-              <td><button type="button" class="btn-primary" data-save="${p.id}">Guardar</button><span class="error" data-msg="${p.id}"></span></td>
+              <td><label class="switch"><input type="checkbox" data-visible="${p.id}" ${p.status === 'publish' ? 'checked' : ''} aria-label="Visible en tienda"><span class="slider"></span></label></td>
+              <td><button type="button" class="btn-primary" data-save="${p.id}">Guardar</button>
+                  <button type="button" class="btn-ghost" data-edit="${p.id}">✏️ Editar</button>
+                  <span class="error" data-msg="${p.id}"></span></td>
               </tr>`
             )
             .join('')}</tbody>
         </table>
         <p><small>Margen = precio − costo Dropi − flete estimado. Alerta cuando ≤ 0: Dropi rechaza la orden.</small></p></div>`;
+
+      document.querySelectorAll('[data-edit]').forEach((el) =>
+        el.addEventListener('click', () => { location.hash = '#/products/' + el.dataset.edit; })
+      );
+      document.querySelectorAll('[data-visible]').forEach((chk) =>
+        chk.addEventListener('change', async () => {
+          chk.disabled = true;
+          const msg = document.querySelector(`[data-msg="${chk.dataset.visible}"]`);
+          try {
+            await apiFetch('/products/' + chk.dataset.visible, { method: 'PUT', body: JSON.stringify({ visible: chk.checked }) });
+            msg.textContent = chk.checked ? '✅ Visible' : '🙈 Oculto';
+            msg.className = 'scout-add-msg ok';
+          } catch (e) {
+            chk.checked = !chk.checked;
+            msg.textContent = 'No se pudo cambiar';
+          } finally { chk.disabled = false; }
+        })
+      );
       document.querySelectorAll('[data-save]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           const id = btn.dataset.save;
@@ -407,21 +429,169 @@
     }
   }
 
+  /* ── Vista: Editar producto (feature 015) ── */
+  let adminConfig = null;
+
+  async function viewProductEdit(id) {
+    content().innerHTML = '<div id="pe-body">Cargando…</div>';
+    try {
+      if (!adminConfig) adminConfig = await apiFetch('/config').catch(() => ({}));
+      const p = await apiFetch('/products/' + id);
+      const heat = adminConfig && adminConfig.clarity_project_id
+        ? `<a class="btn-ghost" href="https://clarity.microsoft.com/projects/view/${esc(adminConfig.clarity_project_id)}/heatmaps" target="_blank" rel="noopener">🗺️ Ver mapa de calor</a>
+           <small>En Clarity cambia entre 📱 móvil y 💻 escritorio. Filtra por la URL del producto.</small>`
+        : `<small>⚠️ Mapa de calor no configurado — falta el Project ID de Microsoft Clarity.</small>`;
+
+      $('pe-body').innerHTML = `
+        <div class="toolbar">
+          <button type="button" class="btn-ghost" id="pe-back">← Volver</button>
+          ${p.permalink ? `<a class="btn-ghost" href="${esc(p.permalink)}" target="_blank" rel="noopener">🔗 Ver en tienda</a>` : ''}
+          <label class="switch-inline"><input type="checkbox" id="pe-visible" ${p.visible ? 'checked' : ''}> Visible en tienda</label>
+          <span id="pe-msg" aria-live="polite"></span>
+        </div>
+        <div class="card">
+          <h2>Editar producto</h2>
+          <label for="pe-name">Nombre</label>
+          <input type="text" id="pe-name" value="${esc(p.name)}" maxlength="300">
+          <label for="pe-price">Precio (COP)</label>
+          <input type="number" id="pe-price" value="${p.regular_price || p.price}" min="1" step="100">
+          <label for="pe-stock">Stock</label>
+          <input type="number" id="pe-stock" value="${p.stock ?? ''}" min="0" step="1">
+          <label for="pe-short">Descripción corta</label>
+          <textarea id="pe-short" rows="2" maxlength="10000">${esc(p.short_description)}</textarea>
+          <label for="pe-desc">Descripción</label>
+          <textarea id="pe-desc" rows="8" maxlength="50000">${esc(p.description)}</textarea>
+          <button type="button" class="btn-cta" id="pe-save">Guardar cambios</button>
+        </div>
+        <div class="card">
+          <h2>Creativos (fotos)</h2>
+          <div class="pe-gallery" id="pe-gallery">${
+            p.images.length
+              ? p.images.map((im) => `<div class="pe-thumb"><img src="${esc(im.src)}" alt="" loading="lazy">${im.id ? `<button type="button" class="pe-del" data-img="${im.id}" title="Quitar">✕</button>` : ''}</div>`).join('')
+              : '<span class="empty">Sin fotos aún</span>'
+          }</div>
+          <label class="btn-primary pe-upload-btn">📤 Subir creativo<input type="file" id="pe-upload" accept="image/*" hidden></label>
+          <span id="pe-upload-msg"></span>
+          <p><small>JPG/PNG/WebP, máx 8 MB. Al guardar se refleja en la tienda si el producto está visible.</small></p>
+        </div>
+        <div class="card">
+          <h2>🗺️ Mapa de calor</h2>
+          ${heat}
+        </div>`;
+
+      $('pe-back').addEventListener('click', () => { location.hash = '#/products'; });
+
+      $('pe-visible').addEventListener('change', async (e) => {
+        try {
+          await apiFetch('/products/' + id, { method: 'PUT', body: JSON.stringify({ visible: e.target.checked }) });
+          $('pe-msg').textContent = e.target.checked ? '✅ Visible en la tienda' : '🙈 Oculto';
+        } catch { e.target.checked = !e.target.checked; $('pe-msg').textContent = 'No se pudo cambiar'; }
+      });
+
+      $('pe-save').addEventListener('click', async () => {
+        $('pe-save').disabled = true;
+        $('pe-msg').textContent = 'Guardando…';
+        const body = {
+          name: $('pe-name').value.trim(),
+          price: parseFloat($('pe-price').value) || undefined,
+          description: $('pe-desc').value,
+          short_description: $('pe-short').value,
+        };
+        const stockRaw = $('pe-stock').value;
+        if (stockRaw !== '') body.stock = parseInt(stockRaw, 10);
+        try {
+          await apiFetch('/products/' + id, { method: 'PUT', body: JSON.stringify(body) });
+          $('pe-msg').textContent = '✅ Guardado — reflejado en la tienda';
+        } catch (err) {
+          $('pe-msg').textContent = 'No se pudo guardar: ' + err.message;
+        } finally { $('pe-save').disabled = false; }
+      });
+
+      $('pe-upload').addEventListener('change', async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        $('pe-upload-msg').textContent = '⏳ Subiendo…';
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+          // apiFetch fuerza JSON; subo con fetch directo conservando el Bearer
+          const resp = await fetch(API + '/products/' + id + '/image', {
+            method: 'POST', headers: { Authorization: 'Bearer ' + getToken() }, body: fd,
+          });
+          if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).message || 'error');
+          $('pe-upload-msg').textContent = '✅ Foto agregada';
+          viewProductEdit(id);
+        } catch (err) {
+          $('pe-upload-msg').textContent = 'No se pudo subir (¿formato o tamaño?)';
+        }
+      });
+
+      document.querySelectorAll('[data-img]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            await apiFetch(`/products/${id}/image/${btn.dataset.img}`, { method: 'DELETE' });
+            viewProductEdit(id);
+          } catch { btn.disabled = false; }
+        })
+      );
+    } catch (e) {
+      if (e.message !== 'session') $('pe-body').innerHTML = errCard('No pudimos cargar el producto');
+    }
+  }
+
   /* ── Vista: IA ── */
+  const fmtUSD = (n) => '$' + Number(n).toFixed(n >= 1 ? 2 : 4) + ' USD';
+
   async function viewAI() {
+    const period = sessionStorage.getItem('tm_admin_ai_period') || '7d';
     content().innerHTML = '<div id="ai-body">Cargando…</div>';
     try {
-      const [metrics, convs] = await Promise.all([
+      const [metrics, convs, usage] = await Promise.all([
         apiFetch('/ai/metrics'),
         apiFetch('/ai/conversations?limit=20'),
+        apiFetch(`/ai/usage?period=${period}`),
       ]);
       const intentTotal = Object.values(metrics.intents).reduce((a, b) => a + b, 0);
       const intentLabels = { buy: '🛒 Compra', recommend: '✨ Recomendación', track: '📦 Rastreo', chat: '💬 Conversación', other: '❓ Otro' };
+      const maxModelCost = Math.max(...usage.by_model.map((m) => m.cost_usd), 0.0001);
       $('ai-body').innerHTML = `
+        <div class="toolbar">
+          <select id="ai-period-sel" aria-label="Período de consumo">
+            <option value="today">Hoy</option>
+            <option value="7d">Últimos 7 días</option>
+            <option value="30d">Últimos 30 días</option>
+          </select>
+        </div>
         <div class="metric-grid">
+          <div class="metric"><div class="value">${usage.total_tokens.toLocaleString('es-CO')}</div><div class="label">Tokens (${period})</div></div>
+          <div class="metric profit"><div class="value">${fmtUSD(usage.cost_usd)}</div><div class="label">Costo estimado</div></div>
+          <div class="metric"><div class="value">${fmtUSD(usage.avg_cost_per_conversation)}</div><div class="label">Costo / conversación</div></div>
           <div class="metric"><div class="value">${metrics.conversations}</div><div class="label">Conversaciones</div></div>
           <div class="metric"><div class="value">${metrics.messages}</div><div class="label">Mensajes</div></div>
         </div>
+        <div class="card"><h2>Consumo por modelo</h2>${
+          usage.by_model.length
+            ? usage.by_model
+                .map(
+                  (m) => `
+            <div class="bar-row">
+              <span class="bar-label" title="${esc(m.model)}">${esc(m.model.split('/').pop())}</span>
+              <div class="bar-track"><div class="bar-fill cta" style="width:${Math.round((m.cost_usd / maxModelCost) * 100)}%"></div></div>
+              <span class="bar-num">${fmtUSD(m.cost_usd)} · ${m.tokens.toLocaleString('es-CO')} tk</span>
+            </div>`
+                )
+                .join('') +
+              (usage.unestimated_calls ? `<p><small>⚠️ ${usage.unestimated_calls} llamadas sin precio configurado (no estimadas)</small></p>` : '')
+            : emptyState('Sin consumo de IA en el período')
+        }</div>
+        <div class="card"><h2>Consumo por canal</h2>${bars(
+          (usage.by_channel || []).map((c) => [
+            c.channel === 'whatsapp' ? '💬 WhatsApp' : c.channel === 'web' ? '💻 Chat web' : c.channel,
+            c.tokens,
+          ]),
+          (usage.by_channel || []).reduce((a, c) => a + c.tokens, 0)
+        )}</div>
         <div class="card"><h2>Intenciones</h2>${bars(
           Object.entries(metrics.intents).map(([k, v]) => [intentLabels[k] || k, v]),
           intentTotal
@@ -449,8 +619,336 @@
               .join('');
         })
       );
+      $('ai-period-sel').value = period;
+      $('ai-period-sel').addEventListener('change', (e) => {
+        sessionStorage.setItem('tm_admin_ai_period', e.target.value);
+        viewAI();
+      });
     } catch (e) {
       if (e.message !== 'session') $('ai-body').innerHTML = errCard('No pudimos cargar las métricas del asistente');
+    }
+  }
+
+  /* ── Vista: WhatsApp (feature 013) ── */
+  let waPollTimer = null;
+  let waOpenPhone = null;
+
+  async function viewWhatsApp() {
+    clearInterval(waPollTimer);
+    content().innerHTML = `
+      <div class="wa-layout">
+        <div id="wa-list" class="card">Cargando…</div>
+        <div id="wa-thread" class="card"><div class="empty">Elige una conversación</div></div>
+      </div>`;
+    await loadWaList();
+    waPollTimer = setInterval(async () => {
+      if (!location.hash.includes('whatsapp')) { clearInterval(waPollTimer); return; }
+      await loadWaList();
+      if (waOpenPhone) await openWaThread(waOpenPhone, true);
+    }, 10000);
+  }
+
+  async function loadWaList() {
+    try {
+      const data = await apiFetch('/wa/conversations');
+      if (!data.items.length) {
+        $('wa-list').innerHTML = emptyState('Aún no hay conversaciones de WhatsApp');
+        return;
+      }
+      $('wa-list').innerHTML = data.items
+        .map(
+          (c) => `
+        <div class="wa-item clickable ${c.phone === waOpenPhone ? 'active' : ''}" data-wa="${esc(c.phone)}" tabindex="0" role="button">
+          <div class="wa-item-top">
+            <strong>${esc(c.name || c.phone)}</strong>
+            <span class="badge ${c.mode === 'human' ? 'alert' : 'ok'}">${c.mode === 'human' ? '🙋 humano' : '🤖 bot'}</span>
+          </div>
+          <small>${esc(c.last_author === 'customer' ? '' : c.last_author + ': ')}${esc(c.last_message)}</small><br>
+          <small class="wa-time">${fmtDate(c.last_activity)}</small>
+        </div>`
+        )
+        .join('');
+      document.querySelectorAll('[data-wa]').forEach((el) =>
+        el.addEventListener('click', () => openWaThread(el.dataset.wa))
+      );
+    } catch (e) {
+      if (e.message !== 'session') $('wa-list').innerHTML = errCard('No pudimos cargar la bandeja');
+    }
+  }
+
+  let waLastRender = '';
+
+  async function openWaThread(phone, silent = false) {
+    waOpenPhone = phone;
+    if (!silent) $('wa-thread').innerHTML = 'Cargando…';
+    try {
+      const t = await apiFetch('/wa/conversations/' + phone);
+
+      // Poll silencioso: si nada cambió, no re-renderizar (sin parpadeo);
+      // si cambió, preservar el borrador del composer antes de redibujar.
+      const fingerprint = phone + '|' + t.mode + '|' + t.messages.length + '|' + t.window_open;
+      if (silent && fingerprint === waLastRender) return;
+      waLastRender = fingerprint;
+      const draft = $('wa-text') ? $('wa-text').value : '';
+
+      const authorLabel = { customer: '', bot: '🤖 ', admin: '🙋 ' };
+      $('wa-thread').innerHTML = `
+        <div class="wa-thread-head">
+          <strong>${esc(t.name || t.phone)}</strong> · ${esc(t.phone)}
+          <span class="badge ${t.mode === 'human' ? 'alert' : 'ok'}">${t.mode === 'human' ? '🙋 humano' : '🤖 bot'}</span>
+          ${t.mode === 'human' ? '<button type="button" class="btn-ghost" id="wa-resume">Reanudar bot</button>' : ''}
+        </div>
+        <div class="wa-msgs" id="wa-msgs">
+          ${t.messages
+            .map(
+              (m) => `<div class="msg ${m.author === 'customer' ? 'assistant' : 'user'}">
+              ${authorLabel[m.author] || ''}${esc(m.content)}${m.delivered === false ? ' ⚠️ no entregado' : ''}
+              <br><small>${fmtDate(m.date)}</small></div>`
+            )
+            .join('')}
+        </div>
+        ${
+          t.window_open
+            ? `<form id="wa-compose">
+                <textarea id="wa-text" rows="2" placeholder="Escribe tu respuesta…" aria-label="Respuesta"></textarea>
+                <button type="submit" class="btn-cta">Enviar</button>
+              </form>
+              <p id="wa-send-msg" class="error" aria-live="polite"></p>`
+            : '<p class="empty">🔒 Ventana de 24h cerrada — no se pueden enviar mensajes libres hasta que el cliente escriba de nuevo.</p>'
+        }`;
+      const msgs = $('wa-msgs');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      if (draft && $('wa-text')) $('wa-text').value = draft;
+
+      const resume = $('wa-resume');
+      if (resume)
+        resume.addEventListener('click', async () => {
+          await apiFetch(`/wa/conversations/${phone}/resume-bot`, { method: 'POST' });
+          openWaThread(phone);
+          loadWaList();
+        });
+
+      const form = $('wa-compose');
+      if (form)
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const text = $('wa-text').value.trim();
+          if (!text) return;
+          const btn = form.querySelector('button');
+          btn.disabled = true;
+          try {
+            await apiFetch(`/wa/conversations/${phone}/reply`, {
+              method: 'POST',
+              body: JSON.stringify({ text }),
+            });
+            openWaThread(phone);
+            loadWaList();
+          } catch (err) {
+            $('wa-send-msg').textContent =
+              err.message === 'window_closed'
+                ? 'La ventana de 24h se cerró — no se pudo enviar'
+                : 'No se pudo enviar el mensaje, reintenta';
+            btn.disabled = false;
+          }
+        });
+    } catch (e) {
+      if (e.message !== 'session') $('wa-thread').innerHTML = errCard('No pudimos cargar la conversación');
+    }
+  }
+
+  /* ── Vista: Scout (feature 014) ── */
+  const fmtPct = (n) => (n === null || n === undefined ? '—' : n.toFixed(1) + '%');
+
+  async function viewScout() {
+    const period = sessionStorage.getItem('tm_scout_period') || '7d';
+    const category = sessionStorage.getItem('tm_scout_cat') || '';
+    const search = sessionStorage.getItem('tm_scout_search') || '';
+    content().innerHTML = `
+      <div class="toolbar">
+        <input type="search" id="scout-search" placeholder="Buscar: ej. lampara solar, audifonos…" value="${esc(search)}" aria-label="Buscar productos">
+        <select id="scout-cat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+        <select id="scout-period" aria-label="Período de velocidad">
+          <option value="today">Hoy</option>
+          <option value="7d">Últimos 7 días</option>
+          <option value="30d">Últimos 30 días</option>
+        </select>
+        <button type="button" class="btn-primary" id="scout-ingest">📥 Capturar catálogo</button>
+        <button type="button" class="btn-primary" id="scout-score">🤖 Evaluar con IA</button>
+        <span id="scout-run-msg" aria-live="polite"></span>
+      </div>
+      <div id="scout-body">Cargando…</div>
+      <div id="scout-demand"></div>`;
+
+    const runSearch = () => { sessionStorage.setItem('tm_scout_search', $('scout-search').value.trim()); viewScout(); };
+    $('scout-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+    $('scout-search').addEventListener('search', runSearch); // click en la "x" de limpiar
+
+    const trigger = (btnId, path, runningMsg) => {
+      $(btnId).addEventListener('click', async () => {
+        $(btnId).disabled = true;
+        $('scout-run-msg').textContent = 'Lanzando…';
+        try {
+          await apiFetch(path, { method: 'POST' });
+          $('scout-run-msg').textContent = runningMsg + ' — consulta el estado en "Última ejecución" al recargar';
+        } catch (e) {
+          $('scout-run-msg').textContent =
+            e.message === 'already_running' ? '⏳ Ya hay una ejecución en curso' : 'No se pudo lanzar';
+          $(btnId).disabled = false;
+        }
+      });
+    };
+    trigger('scout-ingest', '/scout/ingest', '⏳ Captura en curso (varios minutos)');
+    trigger('scout-score', '/scout/score', '🤖 Evaluación IA en curso — solo top candidatos, costo acotado');
+
+    try {
+      const q = new URLSearchParams({ period });
+      if (category) q.set('category', category);
+      if (search) q.set('search', search);
+      const [data, runsData] = await Promise.all([
+        apiFetch('/scout/ranking?' + q),
+        apiFetch('/scout/runs?limit=3'),
+      ]);
+
+      const catSel = $('scout-cat');
+      data.categories.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        catSel.appendChild(opt);
+      });
+      catSel.value = category;
+      catSel.addEventListener('change', (e) => { sessionStorage.setItem('tm_scout_cat', e.target.value); viewScout(); });
+      $('scout-period').value = period;
+      $('scout-period').addEventListener('change', (e) => { sessionStorage.setItem('tm_scout_period', e.target.value); viewScout(); });
+
+      const lastRun = runsData.runs[0];
+      const runLine = lastRun
+        ? `<p><small>Última ejecución (${esc(lastRun.kind)}): ${statusBadge(lastRun.status)} · ${lastRun.processed} procesados, ${lastRun.failed} fallidos · ${fmtDate(lastRun.started_at)}</small></p>`
+        : '';
+
+      if (!data.candidates.length) {
+        $('scout-body').innerHTML =
+          runLine +
+          emptyState(
+            data.computed_at
+              ? 'Sin candidatos para este filtro'
+              : 'Primera captura del catálogo pendiente — pulsa "Capturar catálogo" para empezar a acumular datos'
+          );
+        return;
+      }
+
+      $('scout-body').innerHTML = `
+        ${runLine}
+        <div class="card"><h2>Ranking de candidatos (${data.candidates.length})</h2>
+        <p><small>Velocidad de venta <strong>estimada</strong> por disminución de stock del proveedor — Dropi no publica ventas.</small></p>
+        <table class="keep-cols">
+          <thead><tr><th>Producto</th><th>Costo</th><th>Precio sug.</th><th>Margen</th><th>Stock</th><th>Vel. est./día</th><th>IA</th><th>Acciones</th></tr></thead>
+          <tbody>${data.candidates
+            .map(
+              (c) => `<tr data-pid="${c.dropi_product_id}">
+              <td>${esc(c.name)}<br><small>${esc(c.category || '—')} · ${esc(c.supplier || '')}</small>
+                ${c.is_novelty ? '<span class="badge ok">🆕 novedad</span>' : ''}
+                ${c.is_viable ? '' : '<span class="badge alert">margen ≤ 0</span>'}</td>
+              <td>${fmtCOP(c.cost_price)}</td>
+              <td>${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
+              <td>${fmtPct(c.margin_pct)}</td>
+              <td>${c.stock_total}</td>
+              <td>${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
+              <td>${
+                c.ai
+                  ? `<strong>${c.ai.score}</strong>/100<br><small class="scout-reason">${esc(c.ai.reason)}</small>`
+                  : '<span class="badge">sin evaluar</span>'
+              }</td>
+              <td class="scout-actions">
+                <button type="button" class="btn-cta scout-add" data-add="${c.dropi_product_id}" data-name="${esc(c.name)}">➕ Agregar a productos</button>
+                <a class="btn-ghost scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener">Ver en Dropi</a>
+                <span class="scout-add-msg" data-msg="${c.dropi_product_id}"></span>
+              </td>
+              </tr>`
+            )
+            .join('')}</tbody>
+        </table></div>`;
+
+      document.querySelectorAll('[data-add]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          const pid = btn.dataset.add;
+          const msg = document.querySelector(`[data-msg="${pid}"]`);
+          btn.disabled = true;
+          msg.textContent = '⏳ Importando…';
+          msg.className = 'scout-add-msg';
+          try {
+            const r = await apiFetch('/scout/import/' + pid, { method: 'POST' });
+            if (r.status === 'exists') {
+              msg.textContent = '✓ Ya estaba en la tienda';
+              msg.className = 'scout-add-msg ok';
+            } else {
+              const noImg = r.images_imported === false ? ' (sin fotos — agrégalas en el producto)' : '';
+              msg.innerHTML = '✅ Publicado en la tienda' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
+              msg.className = 'scout-add-msg ok';
+            }
+            btn.textContent = '✓ Agregado';
+          } catch (e) {
+            msg.textContent = e.message.startsWith('woocommerce_error') ? 'Error de WooCommerce' : 'No se pudo agregar';
+            msg.className = 'scout-add-msg err';
+            btn.disabled = false;
+          }
+        })
+      );
+    } catch (e) {
+      if (e.message !== 'session') $('scout-body').innerHTML = errCard('No pudimos cargar el ranking Scout');
+    }
+    loadScoutDemand();
+  }
+
+  async function loadScoutDemand() {
+    try {
+      const d = await apiFetch('/scout/demand');
+      $('scout-demand').innerHTML = `
+        <div class="card"><h2>Demanda insatisfecha
+          <button type="button" class="btn-ghost" id="scout-demand-refresh">🔄 Analizar conversaciones</button></h2>
+        <p><small>Productos que tus clientes pidieron en el chat web o WhatsApp y no están en tu catálogo.</small></p>
+        ${
+          d.terms.length
+            ? `<table class="keep-cols">
+                <thead><tr><th>Término</th><th>Menciones</th><th>Canales</th><th>Candidatos en Dropi</th></tr></thead>
+                <tbody>${d.terms
+                  .map(
+                    (t) => `<tr>
+                    <td><strong>${esc(t.term)}</strong></td>
+                    <td>${t.mention_count}</td>
+                    <td>${t.sample_channels.map((c) => (c === 'whatsapp' ? '💬' : '💻')).join(' ')}</td>
+                    <td>${
+                      t.dropi_candidates.length
+                        ? t.dropi_candidates
+                            .map(
+                              (c) =>
+                                `<a href="https://app.dropi.co/dashboard/product-details/${c.dropi_product_id}" target="_blank" rel="noopener">${esc(c.name)}</a>`
+                            )
+                            .join('<br>')
+                        : '—'
+                    }</td></tr>`
+                  )
+                  .join('')}</tbody>
+              </table>`
+            : emptyState(
+                d.analyzed_at
+                  ? 'Sin demanda insatisfecha detectada — tus clientes encuentran lo que buscan'
+                  : 'Aún sin analizar — pulsa "Analizar conversaciones"'
+              )
+        }</div>`;
+      $('scout-demand-refresh').addEventListener('click', async () => {
+        $('scout-demand-refresh').disabled = true;
+        try {
+          await apiFetch('/scout/demand/refresh', { method: 'POST' });
+          $('scout-demand-refresh').textContent = '⏳ Analizando… recarga en unos segundos';
+        } catch (e) {
+          $('scout-demand-refresh').textContent =
+            e.message === 'already_running' ? '⏳ Ya hay un análisis en curso' : 'No se pudo lanzar';
+          $('scout-demand-refresh').disabled = false;
+        }
+      });
+    } catch (e) {
+      if (e.message !== 'session') $('scout-demand').innerHTML = errCard('No pudimos cargar la demanda insatisfecha');
     }
   }
 
@@ -461,11 +959,22 @@
     customers: viewCustomers,
     products: viewProducts,
     ai: viewAI,
+    whatsapp: viewWhatsApp,
+    scout: viewScout,
   };
 
   function route() {
     if (!getToken()) { showLogin(); return; }
-    const name = (location.hash || '#/dashboard').replace('#/', '') || 'dashboard';
+    const path = (location.hash || '#/dashboard').replace('#/', '') || 'dashboard';
+    const [name, param] = path.split('/');
+    // Ruta anidada: products/{id} → editor del producto
+    if (name === 'products' && param) {
+      document.querySelectorAll('#sidenav a').forEach((a) =>
+        a.classList.toggle('active', a.dataset.nav === 'products')
+      );
+      viewProductEdit(param);
+      return;
+    }
     const view = routes[name] || viewDashboard;
     document.querySelectorAll('#sidenav a').forEach((a) =>
       a.classList.toggle('active', a.dataset.nav === name)

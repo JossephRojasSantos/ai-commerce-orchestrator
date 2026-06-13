@@ -81,6 +81,34 @@ class Settings(BaseSettings):
     ADMIN_TOTP_SECRET: str = ""  # base32; si vacío, MFA deshabilitado (no enrolado)
     ADMIN_PHONE: str = ""  # E.164 sin '+' (ej. 573166235026) para el código de respaldo
 
+    # Observabilidad IA + bandeja WhatsApp (feature 013)
+    # USD por millón de tokens {modelo: [input, output]}; matching por prefijo.
+    AI_MODEL_PRICES: str = (
+        '{"openai/gpt-4o-mini": [0.15, 0.60],'
+        ' "google/gemini-2.0-flash": [0.10, 0.40],'
+        ' "anthropic/claude-haiku-4-5": [1.00, 5.00],'
+        ' "meta-llama/llama-3.1-8b-instruct": [0.02, 0.03]}'
+    )
+    WA_HUMAN_PAUSE_HOURS: int = 12  # pausa del bot tras respuesta manual
+
+    # Product Scout — catálogo Dropi (feature 014)
+    DROPI_INTEGRATION_KEY: str = ""  # token de integración; si vacío, ingesta deshabilitada
+    DROPI_API_BASE: str = "https://api.dropi.co/integrations"
+    # El WAF de Dropi rechaza UAs de CLI/librerías; UA tipo WordPress validado (research R1)
+    DROPI_USER_AGENT: str = "WordPress/6.7; https://tiendamagica.shop"
+    SCOUT_FREIGHT_COST: int = 12000  # flete estimado COP para margen
+    SCOUT_TOP_N: int = 30  # candidatos enviados al scoring IA
+    SCOUT_NOVELTY_DAYS: int = 14
+    SCOUT_NOVELTY_STOCK: int = 50
+    SCOUT_PRICE_MIN: int = 30000  # rango COD atractivo (criterio scoring)
+    SCOUT_PRICE_MAX: int = 150000
+
+    # Editor de productos (feature 015)
+    # Base pública del backend; WooCommerce descarga los creativos desde aquí.
+    PUBLIC_API_BASE: str = "https://api.tiendamagica.shop"
+    # Microsoft Clarity: id del proyecto para el mapa de calor (vacío = sin tracking)
+    CLARITY_PROJECT_ID: str = ""
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

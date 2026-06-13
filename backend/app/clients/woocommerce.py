@@ -97,6 +97,33 @@ class WooCommerceClient:
             raise WCClientError(resp.status_code, resp.text)
         return resp.json()
 
+    async def _post(self, path: str, payload: dict) -> dict:
+        url = f"{settings.WC_BASE_URL}{path}"
+        start = time.monotonic()
+        resp = await self._client.post(url, json=payload)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.info(
+            "wc_request",
+            wc_endpoint=path,
+            method="POST",
+            status=resp.status_code,
+            latency_ms=latency_ms,
+        )
+        if resp.status_code >= 500:
+            raise WCServerError(resp.status_code, resp.text)
+        if resp.status_code >= 400:
+            raise WCClientError(resp.status_code, resp.text)
+        return resp.json()
+
+    async def create_product(self, payload: dict) -> dict:
+        return await self._post("/products", payload)
+
+    async def find_product_by_sku(self, sku: str) -> dict | None:
+        if not sku:
+            return None
+        data = await self._get("/products", {"sku": sku})
+        return data[0] if isinstance(data, list) and data else None
+
     # ── Métodos admin (feature 012) ──────────────────────────
 
     async def list_orders(
@@ -135,6 +162,9 @@ class WooCommerceClient:
 
     async def update_product(self, product_id: int, payload: dict) -> dict:
         return await self._put(f"/products/{product_id}", payload)
+
+    async def get_product_raw(self, product_id: int) -> dict:
+        return await self._get(f"/products/{product_id}")
 
 
 _wc_client: WooCommerceClient | None = None

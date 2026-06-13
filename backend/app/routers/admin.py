@@ -8,7 +8,7 @@ Regla de oro: ningún endpoint devuelve meta_data crudo de WooCommerce
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 
@@ -112,6 +112,17 @@ async def logout(token: str = Depends(require_admin_session)) -> dict:
 @router.get("/me")
 async def me(_: str = Depends(require_admin_session)) -> dict:
     return {"ok": True}
+
+
+@router.get("/config")
+async def admin_config(_: str = Depends(require_admin_session)) -> dict:
+    """Config no sensible para la UI (id de Clarity para el mapa de calor)."""
+    from app.config import settings
+
+    return {
+        "clarity_project_id": settings.CLARITY_PROJECT_ID,
+        "store_url": "https://tiendamagica.shop",
+    }
 
 
 # ── Stats (US1) ──────────────────────────────────────────────
@@ -260,6 +271,22 @@ async def list_products(_: str = Depends(require_admin_session)) -> dict:
 class ProductUpdate(BaseModel):
     price: float | None = Field(default=None, gt=0)
     stock: int | None = Field(default=None, ge=0)
+    name: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=50000)
+    short_description: str | None = Field(default=None, max_length=10000)
+    visible: bool | None = None
+
+
+@router.get("/products/{product_id}")
+async def product_detail(product_id: int, _: str = Depends(require_admin_session)) -> dict:
+    try:
+        return await products_admin.get_product_detail(product_id)
+    except WCClientError as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="product_not_found") from None
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+    except WCServerError:
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
 
 
 @router.put("/products/{product_id}")
@@ -268,16 +295,146 @@ async def update_product(
     req: ProductUpdate,
     _: str = Depends(require_admin_session),
 ) -> dict:
-    if req.price is None and req.stock is None:
+    if all(
+        v is None
+        for v in (
+            req.price,
+            req.stock,
+            req.name,
+            req.description,
+            req.short_description,
+            req.visible,
+        )
+    ):
         raise HTTPException(status_code=422, detail="nothing_to_update") from None
     try:
-        return await products_admin.update_product(product_id, req.price, req.stock)
+        return await products_admin.update_product(
+            product_id,
+            price=req.price,
+            stock=req.stock,
+            name=req.name,
+            description=req.description,
+            short_description=req.short_description,
+            visible=req.visible,
+        )
     except WCClientError as exc:
         if exc.status_code == 404:
             raise HTTPException(status_code=404, detail="product_not_found") from None
         raise HTTPException(status_code=502, detail="store_unavailable") from None
     except WCServerError:
         raise HTTPException(status_code=502, detail="store_unavailable") from None
+
+
+@router.post("/products/{product_id}/image", status_code=201)
+async def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.services.admin import media_store
+
+    if file.content_type not in media_store.ALLOWED_MIME:
+        raise HTTPException(status_code=422, detail="formato_no_soportado") from None
+    content = await file.read()
+    if len(content) > media_store.MAX_BYTES:
+        raise HTTPException(status_code=413, detail="imagen_muy_grande") from None
+    try:
+        return await products_admin.add_product_image(product_id, content, file.content_type)
+    except WCClientError as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="product_not_found") from None
+        raise HTTPException(status_code=502, detail=f"woocommerce_error: {exc.message}") from None
+    except WCServerError:
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+
+
+@router.delete("/products/{product_id}/image/{image_id}")
+async def delete_product_image(
+    product_id: int, image_id: int, _: str = Depends(require_admin_session)
+) -> dict:
+    try:
+        return await products_admin.delete_product_image(product_id, image_id)
+    except (WCClientError, WCServerError):
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+
+
+# ── Consumo IA (feature 013, US1) ───────────────────────────
+
+
+@router.get("/ai/usage")
+async def ai_usage_summary(
+    period: Literal["today", "7d", "30d"] = Query("7d"),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.services.admin import ai_usage as ai_usage_svc
+
+    return await ai_usage_svc.get_usage_summary(period)
+
+
+# ── Bandeja WhatsApp (feature 013, US2/US3) ──────────────────
+
+
+class WaReplyRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+@router.get("/wa/conversations")
+async def wa_conversations(_: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    return {"items": await wa_inbox.list_conversations()}
+
+
+@router.get("/wa/conversations/{phone}")
+async def wa_thread(phone: str, _: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    thread = await wa_inbox.get_thread(phone)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    return thread
+
+
+@router.post("/wa/conversations/{phone}/reply")
+async def wa_reply(
+    phone: str,
+    req: WaReplyRequest,
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.integrations.whatsapp.client import send_text_message
+    from app.services import wa_inbox
+
+    thread = await wa_inbox.get_thread(phone)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    if not thread["window_open"]:
+        raise HTTPException(status_code=409, detail="window_closed") from None
+
+    result = await send_text_message(wa_inbox.normalize_phone(phone), req.text)
+    delivered = result.status == "sent"
+    await wa_inbox.record_outgoing(phone, req.text, author="admin", delivered=delivered)
+
+    if not delivered:
+        raise HTTPException(status_code=502, detail="whatsapp_send_failed") from None
+
+    conv = await wa_inbox.set_mode(phone, "human")
+    logger.info("admin.wa_reply_sent", phone=phone)
+    return {
+        "ok": True,
+        "mode": "human",
+        "human_until": conv.human_until.isoformat() if conv and conv.human_until else None,
+    }
+
+
+@router.post("/wa/conversations/{phone}/resume-bot")
+async def wa_resume_bot(phone: str, _: str = Depends(require_admin_session)) -> dict:
+    from app.services import wa_inbox
+
+    conv = await wa_inbox.set_mode(phone, "bot")
+    if conv is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    logger.info("admin.wa_bot_resumed", phone=phone)
+    return {"ok": True, "mode": "bot"}
 
 
 # ── Métricas IA (US5) ────────────────────────────────────────
@@ -386,3 +543,109 @@ async def ai_conversation_detail(session_id: str, _: str = Depends(require_admin
             for m in msgs
         ],
     }
+
+
+# --- Product Scout (feature 014) ---
+
+
+async def _scout_lock_active(key: str) -> bool:
+    import redis.asyncio as aioredis
+
+    from app.config import settings
+
+    r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    try:
+        return bool(await r.exists(key))
+    finally:
+        await r.aclose()
+
+
+@router.get("/scout/ranking")
+async def scout_ranking(
+    category: str | None = None,
+    period: Literal["today", "7d", "30d"] = "7d",
+    include_nonviable: bool = False,
+    search: str | None = None,
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin import scout as scout_svc
+
+    async with AsyncSessionLocal() as db:
+        return await scout_svc.get_ranking(
+            db,
+            category=category,
+            period=period,
+            include_nonviable=include_nonviable,
+            search=search,
+        )
+
+
+@router.get("/scout/runs")
+async def scout_runs(
+    limit: int = Query(default=10, le=50),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin import scout as scout_svc
+
+    async with AsyncSessionLocal() as db:
+        return {"runs": await scout_svc.list_runs(db, limit=limit)}
+
+
+@router.post("/scout/ingest", status_code=202)
+async def scout_ingest_trigger(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.workers.scout_ingest import INGEST_LOCK_KEY, run_ingest_locked
+
+    if await _scout_lock_active(INGEST_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_ingest_locked())
+    return {"status": "running", "kind": "ingest"}
+
+
+@router.post("/scout/score", status_code=202)
+async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.services.admin.scout_score import SCORE_LOCK_KEY, run_scoring_locked
+
+    if await _scout_lock_active(SCORE_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_scoring_locked())
+    return {"status": "running", "kind": "score"}
+
+
+@router.post("/scout/import/{dropi_product_id}", status_code=201)
+async def scout_import(dropi_product_id: int, _: str = Depends(require_admin_session)) -> dict:
+    from app.services.admin.scout_import import import_product
+
+    try:
+        result = await import_product(dropi_product_id)
+    except (WCClientError, WCServerError) as exc:
+        raise HTTPException(status_code=502, detail=f"woocommerce_error: {exc.message}") from None
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return result
+
+
+@router.get("/scout/demand")
+async def scout_demand(_: str = Depends(require_admin_session)) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin.scout_demand import list_unmet_demand
+
+    async with AsyncSessionLocal() as db:
+        return await list_unmet_demand(db)
+
+
+@router.post("/scout/demand/refresh", status_code=202)
+async def scout_demand_refresh(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.services.admin.scout_demand import DEMAND_LOCK_KEY, run_demand_locked
+
+    if await _scout_lock_active(DEMAND_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_demand_locked())
+    return {"status": "running", "kind": "demand"}

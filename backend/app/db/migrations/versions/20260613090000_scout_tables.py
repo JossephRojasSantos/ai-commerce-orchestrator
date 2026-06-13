@@ -10,7 +10,6 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "20260613090000"
@@ -75,9 +74,9 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("term", sa.Text(), nullable=False),
         sa.Column("mention_count", sa.Integer(), nullable=True),
-        sa.Column("sample_channels", postgresql.ARRAY(sa.Text()), nullable=True),
+        sa.Column("sample_channels", sa.JSON(), nullable=True),
         sa.Column("matched_own_catalog", sa.Boolean(), nullable=True),
-        sa.Column("dropi_candidates", postgresql.JSONB(), nullable=True),
+        sa.Column("dropi_candidates", sa.JSON(), nullable=True),
         sa.Column("analyzed_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("term"),

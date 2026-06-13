@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Date,
@@ -14,7 +15,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -79,9 +79,9 @@ class ScoutDemandTerm(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     term: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     mention_count: Mapped[int] = mapped_column(Integer, default=1)
-    sample_channels: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    sample_channels: Mapped[list | None] = mapped_column(JSON, nullable=True)
     matched_own_catalog: Mapped[bool] = mapped_column(Boolean, default=False)
-    dropi_candidates: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    dropi_candidates: Mapped[list | None] = mapped_column(JSON, nullable=True)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 

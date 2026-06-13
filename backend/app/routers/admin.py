@@ -532,3 +532,24 @@ async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
         raise HTTPException(status_code=409, detail="already_running") from None
     asyncio.get_running_loop().create_task(run_scoring_locked())
     return {"status": "running", "kind": "score"}
+
+
+@router.get("/scout/demand")
+async def scout_demand(_: str = Depends(require_admin_session)) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin.scout_demand import list_unmet_demand
+
+    async with AsyncSessionLocal() as db:
+        return await list_unmet_demand(db)
+
+
+@router.post("/scout/demand/refresh", status_code=202)
+async def scout_demand_refresh(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.services.admin.scout_demand import DEMAND_LOCK_KEY, run_demand_locked
+
+    if await _scout_lock_active(DEMAND_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_demand_locked())
+    return {"status": "running", "kind": "demand"}

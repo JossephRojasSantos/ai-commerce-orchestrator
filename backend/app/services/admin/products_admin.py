@@ -76,19 +76,87 @@ async def list_products() -> list[dict]:
     return items
 
 
-async def update_product(product_id: int, price: float | None, stock: int | None) -> dict:
+def _to_detail(p: dict) -> dict:
+    """DTO de edición — incluye descripción e imágenes (sin meta crudo)."""
+    dto = _to_dto(p)
+    dto["description"] = p.get("description", "")
+    dto["short_description"] = p.get("short_description", "")
+    dto["images"] = [
+        {"id": img.get("id"), "src": img.get("src", "")} for img in p.get("images") or []
+    ]
+    dto["permalink"] = p.get("permalink", "")
+    dto["visible"] = p.get("status") == "publish"
+    return dto
+
+
+async def get_product_detail(product_id: int) -> dict:
+    wc = await get_wc_client()
+    raw = await wc.get_product_raw(product_id)
+    return _to_detail(raw)
+
+
+async def update_product(
+    product_id: int,
+    price: float | None = None,
+    stock: int | None = None,
+    name: str | None = None,
+    description: str | None = None,
+    short_description: str | None = None,
+    visible: bool | None = None,
+) -> dict:
     payload: dict = {}
     if price is not None:
         payload["regular_price"] = str(int(price))
     if stock is not None:
         payload["stock_quantity"] = stock
         payload["manage_stock"] = True
+    if name is not None:
+        payload["name"] = name
+    if description is not None:
+        payload["description"] = description
+    if short_description is not None:
+        payload["short_description"] = short_description
+    if visible is not None:
+        # publish = visible en la tienda · draft = oculto
+        payload["status"] = "publish" if visible else "draft"
+        payload["catalog_visibility"] = "visible" if visible else "hidden"
 
     wc = await get_wc_client()
     updated = await wc.update_product(product_id, payload)
     await invalidate_caches()
     logger.info("admin.product_updated", product_id=product_id, fields=list(payload))
-    return _to_dto(updated)
+    return _to_detail(updated)
+
+
+async def add_product_image(product_id: int, content: bytes, mime: str) -> dict:
+    """Sube un creativo: lo guarda temporal, lo añade vía URL y WC lo descarga.
+
+    Conserva las imágenes existentes (por id) y agrega la nueva (por src).
+    """
+    from app.services.admin import media_store
+
+    wc = await get_wc_client()
+    current = await wc.get_product_raw(product_id)
+    existing = [{"id": img["id"]} for img in current.get("images") or [] if img.get("id")]
+
+    media_id = await media_store.store_image(content, mime)
+    images = existing + [{"src": media_store.public_url(media_id)}]
+
+    updated = await wc.update_product(product_id, {"images": images})
+    await invalidate_caches()
+    logger.info("admin.product_image_added", product_id=product_id)
+    return _to_detail(updated)
+
+
+async def delete_product_image(product_id: int, image_id: int) -> dict:
+    """Quita una imagen del producto (deja las demás)."""
+    wc = await get_wc_client()
+    current = await wc.get_product_raw(product_id)
+    images = [{"id": img["id"]} for img in current.get("images") or [] if img.get("id") != image_id]
+    updated = await wc.update_product(product_id, {"images": images})
+    await invalidate_caches()
+    logger.info("admin.product_image_deleted", product_id=product_id, image_id=image_id)
+    return _to_detail(updated)
 
 
 async def invalidate_caches() -> None:
@@ -103,4 +171,12 @@ def supplier_cost_map(products: list[dict]) -> dict[int, float]:
     return {p["id"]: p["supplier_cost"] for p in products if p.get("supplier_cost") is not None}
 
 
-__all__ = ["list_products", "update_product", "invalidate_caches", "supplier_cost_map"]
+__all__ = [
+    "list_products",
+    "get_product_detail",
+    "update_product",
+    "add_product_image",
+    "delete_product_image",
+    "invalidate_caches",
+    "supplier_cost_map",
+]

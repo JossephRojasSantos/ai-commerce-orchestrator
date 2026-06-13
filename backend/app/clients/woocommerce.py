@@ -163,6 +163,9 @@ class WooCommerceClient:
     async def update_product(self, product_id: int, payload: dict) -> dict:
         return await self._put(f"/products/{product_id}", payload)
 
+    async def get_product_raw(self, product_id: int) -> dict:
+        return await self._get(f"/products/{product_id}")
+
 
 _wc_client: WooCommerceClient | None = None
 

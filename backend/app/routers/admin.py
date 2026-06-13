@@ -465,3 +465,58 @@ async def ai_conversation_detail(session_id: str, _: str = Depends(require_admin
             for m in msgs
         ],
     }
+
+
+# --- Product Scout (feature 014) ---
+
+
+async def _scout_lock_active(key: str) -> bool:
+    import redis.asyncio as aioredis
+
+    from app.config import settings
+
+    r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    try:
+        return bool(await r.exists(key))
+    finally:
+        await r.aclose()
+
+
+@router.get("/scout/ranking")
+async def scout_ranking(
+    category: str | None = None,
+    period: Literal["today", "7d", "30d"] = "7d",
+    include_nonviable: bool = False,
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin import scout as scout_svc
+
+    async with AsyncSessionLocal() as db:
+        return await scout_svc.get_ranking(
+            db, category=category, period=period, include_nonviable=include_nonviable
+        )
+
+
+@router.get("/scout/runs")
+async def scout_runs(
+    limit: int = Query(default=10, le=50),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.db.base import AsyncSessionLocal
+    from app.services.admin import scout as scout_svc
+
+    async with AsyncSessionLocal() as db:
+        return {"runs": await scout_svc.list_runs(db, limit=limit)}
+
+
+@router.post("/scout/ingest", status_code=202)
+async def scout_ingest_trigger(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.workers.scout_ingest import INGEST_LOCK_KEY, run_ingest_locked
+
+    if await _scout_lock_active(INGEST_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_ingest_locked())
+    return {"status": "running", "kind": "ingest"}

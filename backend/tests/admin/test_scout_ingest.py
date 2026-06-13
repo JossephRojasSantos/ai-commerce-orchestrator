@@ -119,3 +119,25 @@ async def test_ingest_lock_released_after_run():
         result = await scout_ingest.run_ingest_locked()
     assert result == {"status": "ok"}
     assert calls == {"set": 1, "delete": 1}  # lock liberado
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_categories():
+    respx.get(f"{settings.DROPI_API_BASE}/categories/").mock(
+        return_value=httpx.Response(
+            200, json={"isSuccess": True, "objects": [{"id": 1, "name": "Hogar"}]}
+        )
+    )
+    out = await dropi.list_categories()
+    assert out == [{"id": 1, "name": "Hogar"}]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_categories_failure_raises():
+    respx.get(f"{settings.DROPI_API_BASE}/categories/").mock(
+        return_value=httpx.Response(200, json={"isSuccess": False})
+    )
+    with pytest.raises(RuntimeError):
+        await dropi.list_categories()

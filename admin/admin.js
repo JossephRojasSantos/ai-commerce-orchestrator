@@ -62,6 +62,7 @@
 
   function showApp() {
     $('login-view').setAttribute('hidden', '');
+    $('mfa-view').setAttribute('hidden', '');
     $('app-view').removeAttribute('hidden');
     const ret = sessionStorage.getItem('tm_admin_return');
     sessionStorage.removeItem('tm_admin_return');
@@ -177,11 +178,58 @@
       .join('');
   }
 
+  const CHART_VARS = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6'];
+  const statusLabels = {
+    processing: '⚙️ Procesando',
+    completed: '✅ Completada',
+    cancelled: '✖️ Cancelada',
+    'on-hold': '⏸️ En espera',
+    pending: '🕒 Pendiente',
+    failed: '⚠️ Fallida',
+    refunded: '↩️ Reembolsada',
+  };
+
+  /* Donut SVG-less con conic-gradient + leyenda. entries: [[label, value], …] */
+  function donut(entries, centerCap = '') {
+    const data = entries.filter(([, v]) => v > 0);
+    const total = data.reduce((a, [, v]) => a + v, 0);
+    if (!total) return emptyState('Sin datos en el período');
+    let acc = 0;
+    const stops = data
+      .map(([, v], i) => {
+        const from = (acc / total) * 360;
+        acc += v;
+        const to = (acc / total) * 360;
+        return `var(${CHART_VARS[i % CHART_VARS.length]}) ${from}deg ${to}deg`;
+      })
+      .join(', ');
+    const legend = data
+      .map(([label, v], i) => {
+        const pct = Math.round((v / total) * 100);
+        return `<li>
+          <span class="dot" style="background:var(${CHART_VARS[i % CHART_VARS.length]})"></span>
+          <span>${esc(label)}</span>
+          <b>${v} <span class="pct">${pct}%</span></b>
+        </li>`;
+      })
+      .join('');
+    return `<div class="donut-wrap">
+      <div class="donut" style="background:conic-gradient(${stops})" role="img" aria-label="${esc(centerCap)}: ${total}">
+        <div class="donut-hole"><span class="donut-total">${total}</span><span class="donut-cap">${esc(centerCap)}</span></div>
+      </div>
+      <ul class="legend">${legend}</ul>
+    </div>`;
+  }
+
   /* ── Vista: Dashboard ── */
   async function viewDashboard() {
     const period = sessionStorage.getItem('tm_admin_period') || '7d';
     content().innerHTML = `
-      <div class="toolbar">
+      <div class="page-head">
+        <div>
+          <h1>📊 Dashboard</h1>
+          <p class="sub">Resumen de ventas y operación de la tienda</p>
+        </div>
         <select id="period-sel" aria-label="Período">
           <option value="today">Hoy</option>
           <option value="7d">Últimos 7 días</option>
@@ -197,7 +245,6 @@
 
     try {
       const s = await apiFetch(`/stats?period=${period}`);
-      const totalPay = Object.values(s.by_payment).reduce((a, b) => a + b, 0);
       const totalUnits = s.top_products.reduce((a, p) => a + p.units, 0);
       $('dash-body').innerHTML = `
         <div class="metric-grid">
@@ -206,13 +253,17 @@
           <div class="metric"><div class="value">${s.orders}</div><div class="label">Órdenes</div></div>
           <div class="metric"><div class="value">${fmtCOP(s.avg_ticket)}</div><div class="label">Ticket promedio</div></div>
         </div>
-        <div class="card"><h2>Órdenes por estado</h2>${bars(Object.entries(s.by_status), Object.values(s.by_status).reduce((a, b) => a + b, 0))}</div>
-        <div class="card"><h2>Método de pago</h2>${bars(
-          Object.entries(s.by_payment).map(([k, v]) => [k === 'cod' ? '🏠 Contraentrega' : '💳 En línea', v]),
-          totalPay,
-          'cta'
-        )}</div>
-        <div class="card"><h2>Top productos</h2>${bars(s.top_products.map((p) => [p.name, p.units]), totalUnits)}</div>`;
+        <div class="chart-grid">
+          <div class="card"><h2>📦 Órdenes por estado</h2>${donut(
+            Object.entries(s.by_status).map(([k, v]) => [statusLabels[k] || k, v]),
+            'órdenes'
+          )}</div>
+          <div class="card"><h2>💳 Método de pago</h2>${donut(
+            Object.entries(s.by_payment).map(([k, v]) => [k === 'cod' ? '🏠 Contraentrega' : '💳 En línea', v]),
+            'pagos'
+          )}</div>
+        </div>
+        <div class="card"><h2>🏆 Top productos</h2>${bars(s.top_products.map((p) => [p.name, p.units]), totalUnits)}</div>`;
     } catch (e) {
       if (e.message !== 'session') $('dash-body').innerHTML = errCard('No pudimos cargar las estadísticas de la tienda');
     }
@@ -591,11 +642,14 @@
         apiFetch('/ai/conversations?limit=20'),
         apiFetch(`/ai/usage?period=${period}`),
       ]);
-      const intentTotal = Object.values(metrics.intents).reduce((a, b) => a + b, 0);
       const intentLabels = { buy: '🛒 Compra', recommend: '✨ Recomendación', track: '📦 Rastreo', chat: '💬 Conversación', other: '❓ Otro' };
       const maxModelCost = Math.max(...usage.by_model.map((m) => m.cost_usd), 0.0001);
       $('ai-body').innerHTML = `
-        <div class="toolbar">
+        <div class="page-head">
+          <div>
+            <h1>🪄 Asistente IA</h1>
+            <p class="sub">Consumo, costo e intenciones del asistente</p>
+          </div>
           <select id="ai-period-sel" aria-label="Período de consumo">
             <option value="today">Hoy</option>
             <option value="7d">Últimos 7 días</option>
@@ -609,7 +663,7 @@
           <div class="metric"><div class="value">${metrics.conversations}</div><div class="label">Conversaciones</div></div>
           <div class="metric"><div class="value">${metrics.messages}</div><div class="label">Mensajes</div></div>
         </div>
-        <div class="card"><h2>Consumo por modelo</h2>${
+        <div class="card"><h2>🤖 Consumo por modelo</h2>${
           usage.by_model.length
             ? usage.by_model
                 .map(
@@ -624,17 +678,20 @@
               (usage.unestimated_calls ? `<p><small>⚠️ ${usage.unestimated_calls} llamadas sin precio configurado (no estimadas)</small></p>` : '')
             : emptyState('Sin consumo de IA en el período')
         }</div>
-        <div class="card"><h2>Consumo por canal</h2>${bars(
-          (usage.by_channel || []).map((c) => [
-            c.channel === 'whatsapp' ? '💬 WhatsApp' : c.channel === 'web' ? '💻 Chat web' : c.channel,
-            c.tokens,
-          ]),
-          (usage.by_channel || []).reduce((a, c) => a + c.tokens, 0)
-        )}</div>
-        <div class="card"><h2>Intenciones</h2>${bars(
-          Object.entries(metrics.intents).map(([k, v]) => [intentLabels[k] || k, v]),
-          intentTotal
-        )}</div>
+        <div class="chart-grid">
+          <div class="card"><h2>🎯 Intenciones</h2>${donut(
+            Object.entries(metrics.intents).map(([k, v]) => [intentLabels[k] || k, v]),
+            'intenciones'
+          )}</div>
+          <div class="card"><h2>📡 Consumo por canal</h2>${bars(
+            (usage.by_channel || []).map((c) => [
+              c.channel === 'whatsapp' ? '💬 WhatsApp' : c.channel === 'web' ? '💻 Chat web' : c.channel,
+              c.tokens,
+            ]),
+            (usage.by_channel || []).reduce((a, c) => a + c.tokens, 0),
+            'cta'
+          )}</div>
+        </div>
         <div class="card"><h2>Últimas conversaciones</h2>
           ${
             convs.items.length

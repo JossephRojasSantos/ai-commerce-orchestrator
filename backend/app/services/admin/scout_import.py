@@ -65,17 +65,20 @@ async def import_product(dropi_product_id: int) -> dict:
 
     images = [{"src": u} for u in dropi.image_urls(detail)]
     categories_meta = detail.get("categories") or []
+    stock = dropi.stock_total(detail)
     payload = {
         "name": name,
         "type": "simple",
-        "status": "draft",  # se publica tras revisar precio/fotos
+        "status": "publish",  # visible en la tienda al instante (el admin edita luego)
+        "catalog_visibility": "visible",
         "regular_price": str(int(float(suggested))) if suggested else "",
         "sku": sku,
         "description": _strip_html_keep_basic(
             detail.get("description") or detail.get("dropi_app_description") or ""
         ),
         "manage_stock": True,
-        "stock_quantity": dropi.stock_total(detail),
+        "stock_quantity": stock,
+        "stock_status": "instock" if stock > 0 else "outofstock",
         "images": images,
         "meta_data": [
             {"key": "_dropi_product", "value": json.dumps(_dropi_meta_object(detail))},

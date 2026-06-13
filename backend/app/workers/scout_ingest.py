@@ -48,7 +48,16 @@ async def run_ingest() -> dict:
         async with AsyncSessionLocal() as db:
             start = 0
             while True:
-                batch = await dropi.list_products(start)
+                try:
+                    batch = await dropi.list_products(start)
+                except Exception as exc:  # noqa: BLE001
+                    # Dropi devuelve 400 en offsets profundos (límite de paginación
+                    # del servidor, visto en prod en startData=2800): con datos ya
+                    # capturados se trata como fin de catálogo, no como falla.
+                    if processed > 0:
+                        logger.warning("scout.pagination_stopped", start=start, error=str(exc))
+                        break
+                    raise
                 if not batch:
                     break
                 for product in batch:

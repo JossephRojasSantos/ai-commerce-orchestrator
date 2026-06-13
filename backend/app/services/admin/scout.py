@@ -34,7 +34,10 @@ def margin_pct(suggested: float | None, cost: float, freight: int | None = None)
     if not suggested or suggested <= 0:
         return None
     fr = settings.SCOUT_FREIGHT_COST if freight is None else freight
-    return round((float(suggested) - float(cost) - fr) / float(suggested) * 100, 2)
+    pct = round((float(suggested) - float(cost) - fr) / float(suggested) * 100, 2)
+    # margin_pct es NUMERIC(6,2): clamp a ±9999.99. Un margen viable está en 0-100%;
+    # valores extremos solo ocurren en productos no viables (precio sugerido ínfimo).
+    return max(-9999.99, min(9999.99, pct))
 
 
 def velocity_from_stocks(stocks_by_date: list[tuple[date, int]]) -> float | None:

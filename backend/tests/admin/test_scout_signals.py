@@ -223,3 +223,11 @@ async def test_compute_signals_batches_large_insert(scout_db, monkeypatch):
     assert n == 2100
     total = (await scout_db.execute(text("SELECT count(*) FROM scout_signal"))).scalar()
     assert total == 2100
+
+
+def test_margin_pct_clamped_to_column_range():
+    # precio sugerido ínfimo vs costo enorme → margen extremo, debe clampar a -9999.99
+    m = margin_pct(100, 500000, 12000)
+    assert m == -9999.99  # cabe en NUMERIC(6,2), no desborda
+    # margen viable normal sin tocar
+    assert margin_pct(99900, 50000, 12000) == pytest.approx(37.94, abs=0.01)

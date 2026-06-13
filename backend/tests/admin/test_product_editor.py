@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.services.admin import products_admin
 
 from tests.admin.conftest import ADMIN_AUTH, make_product
 

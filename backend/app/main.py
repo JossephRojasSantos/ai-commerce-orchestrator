@@ -73,8 +73,8 @@ def create_app() -> FastAPI:
 
     from app.routers.admin import router as admin_router
     from app.routers.notifications import router as notifications_router
-    from app.routers.public import router as public_router
     from app.routers.orchestrator import router as orchestrator_router
+    from app.routers.public import router as public_router
     from app.routers.rag import router as rag_router
     from app.routers.wc_webhook import router as wc_webhook_router
     from app.routers.whatsapp import router as whatsapp_router

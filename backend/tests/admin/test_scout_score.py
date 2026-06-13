@@ -60,7 +60,9 @@ async def _seed(db, monkeypatch, n=3):
     monkeypatch.setattr(scout_mod, "business_today", lambda: today)
     for pid in range(1, n + 1):
         await upsert_snapshot(
-            db, _product(pid=pid, name=f"Prod {pid}", stock=100 + pid * 10), today - timedelta(days=1)
+            db,
+            _product(pid=pid, name=f"Prod {pid}", stock=100 + pid * 10),
+            today - timedelta(days=1),
         )
         await upsert_snapshot(db, _product(pid=pid, name=f"Prod {pid}", stock=80), today)
     await db.commit()
@@ -120,7 +122,9 @@ async def test_run_scoring_llm_failure_is_besteffort():
 
     with (
         patch("app.db.base.AsyncSessionLocal", return_value=fake_db),
-        patch.object(scout_score, "_top_candidates", new=AsyncMock(side_effect=RuntimeError("db down"))),
+        patch.object(
+            scout_score, "_top_candidates", new=AsyncMock(side_effect=RuntimeError("db down"))
+        ),
     ):
         result = await scout_score.run_scoring()
     assert result["status"] == "error"

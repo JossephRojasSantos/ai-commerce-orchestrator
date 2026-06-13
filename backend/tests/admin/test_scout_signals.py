@@ -160,9 +160,7 @@ async def test_compute_signals_velocity_and_margin(scout_db, monkeypatch):
     n = await compute_signals(scout_db)
     assert n == 1
     row = (
-        await scout_db.execute(
-            text("SELECT velocity_7d, margin_pct, is_viable FROM scout_signal")
-        )
+        await scout_db.execute(text("SELECT velocity_7d, margin_pct, is_viable FROM scout_signal"))
     ).one()
     assert float(row[0]) == 30.0  # quickstart escenario 2
     assert float(row[1]) == pytest.approx(37.94, abs=0.01)
@@ -205,8 +203,6 @@ async def test_compute_signals_novelty(scout_db, monkeypatch):
     await scout_db.commit()
     await compute_signals(scout_db)
     row = (
-        await scout_db.execute(
-            text("SELECT is_novelty FROM scout_signal WHERE dropi_product_id=3")
-        )
+        await scout_db.execute(text("SELECT is_novelty FROM scout_signal WHERE dropi_product_id=3"))
     ).one()
     assert bool(row[0]) is True  # FR-006

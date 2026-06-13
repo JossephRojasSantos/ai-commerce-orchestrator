@@ -101,10 +101,6 @@ def downgrade() -> None:
     op.drop_table("scout_demand_term")
     op.drop_table("scout_ai_score")
     op.drop_table("scout_signal")
-    op.drop_index(
-        "ix_scout_product_snapshot_snapshot_date", table_name="scout_product_snapshot"
-    )
-    op.drop_index(
-        "ix_scout_product_snapshot_dropi_product_id", table_name="scout_product_snapshot"
-    )
+    op.drop_index("ix_scout_product_snapshot_snapshot_date", table_name="scout_product_snapshot")
+    op.drop_index("ix_scout_product_snapshot_dropi_product_id", table_name="scout_product_snapshot")
     op.drop_table("scout_product_snapshot")

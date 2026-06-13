@@ -130,7 +130,9 @@ async def run_demand_analysis() -> dict:
             messages = await _customer_messages(db)
             if messages:
                 listing = "\n".join(f"{ch}: {txt[:200]}" for ch, txt in messages[:300])
-                raw = await chat_complete([{"role": "user", "content": _PROMPT.format(messages=listing)}])
+                raw = await chat_complete(
+                    [{"role": "user", "content": _PROMPT.format(messages=listing)}]
+                )
                 terms = _parse_terms(raw)
 
                 own_names = await _own_catalog_names()

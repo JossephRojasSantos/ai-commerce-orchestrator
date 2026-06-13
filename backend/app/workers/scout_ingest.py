@@ -65,9 +65,7 @@ async def run_ingest() -> dict:
                 await db.commit()
                 start += dropi.PAGE_SIZE
             signals = await compute_signals(db)
-            logger.info(
-                "scout.ingest_done", processed=processed, failed=failed, signals=signals
-            )
+            logger.info("scout.ingest_done", processed=processed, failed=failed, signals=signals)
     except Exception as exc:  # noqa: BLE001
         status, error_msg = "error", str(exc)[:500]
         logger.error("scout.ingest_failed", error=str(exc))

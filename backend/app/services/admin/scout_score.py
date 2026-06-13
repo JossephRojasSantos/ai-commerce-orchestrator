@@ -37,7 +37,9 @@ def content_hash(name: str, suggested_price, category: str | None, description: 
 
 async def _top_candidates(db, top_n: int) -> list[dict]:
     max_date = (
-        await db.execute(select(ScoutSignal.last_seen_date).order_by(ScoutSignal.last_seen_date.desc()).limit(1))
+        await db.execute(
+            select(ScoutSignal.last_seen_date).order_by(ScoutSignal.last_seen_date.desc()).limit(1)
+        )
     ).scalar()
     if max_date is None:
         return []
@@ -121,7 +123,19 @@ async def run_scoring() -> dict:
                     price_min=settings.SCOUT_PRICE_MIN,
                     price_max=settings.SCOUT_PRICE_MAX,
                     products=json.dumps(
-                        [{k: c[k] for k in ("id", "name", "category", "suggested_price", "description")} for c in batch],
+                        [
+                            {
+                                k: c[k]
+                                for k in (
+                                    "id",
+                                    "name",
+                                    "category",
+                                    "suggested_price",
+                                    "description",
+                                )
+                            }
+                            for c in batch
+                        ],
                         ensure_ascii=False,
                     ),
                 )

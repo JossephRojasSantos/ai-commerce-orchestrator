@@ -296,11 +296,7 @@ async def list_runs(db, limit: int = 10) -> list[dict]:
     from app.models.scout import ScoutIngestRun
 
     rows = (
-        (
-            await db.execute(
-                select(ScoutIngestRun).order_by(ScoutIngestRun.id.desc()).limit(limit)
-            )
-        )
+        (await db.execute(select(ScoutIngestRun).order_by(ScoutIngestRun.id.desc()).limit(limit)))
         .scalars()
         .all()
     )

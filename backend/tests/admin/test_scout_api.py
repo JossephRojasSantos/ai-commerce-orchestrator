@@ -123,9 +123,7 @@ async def test_scout_endpoints_require_session():
 
 @pytest.mark.asyncio
 async def test_ingest_endpoint_409_when_locked(admin_client):
-    with patch(
-        "app.routers.admin._scout_lock_active", new=AsyncMock(return_value=True)
-    ):
+    with patch("app.routers.admin._scout_lock_active", new=AsyncMock(return_value=True)):
         resp = await admin_client.post("/v1/admin/scout/ingest")
     assert resp.status_code == 409
     assert resp.json()["message"] == "already_running"  # ErrorResponse del handler global

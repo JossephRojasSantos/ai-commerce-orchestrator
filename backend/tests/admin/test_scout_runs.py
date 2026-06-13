@@ -185,9 +185,7 @@ async def test_run_demand_analysis_happy_path(scout_factory, monkeypatch):
         patch("app.db.base.AsyncSessionLocal", scout_factory),
         patch.object(scout_demand, "_customer_messages", side_effect=fake_msgs),
         patch("app.clients.llm.chat_complete", side_effect=fake_llm),
-        patch.object(
-            scout_demand, "_own_catalog_names", new=AsyncMock(return_value=["gorra"])
-        ),
+        patch.object(scout_demand, "_own_catalog_names", new=AsyncMock(return_value=["gorra"])),
     ):
         result = await scout_demand.run_demand_analysis()
 
@@ -264,14 +262,14 @@ async def test_scout_runs_and_ranking_period_endpoints(scout_factory, monkeypatc
 
         ranking = (await admin_client.get("/v1/admin/scout/ranking?period=30d")).json()
         assert len(ranking["candidates"]) == 1
-        assert ranking["candidates"][0]["velocity_7d"] == 50.0  # Δ entre snapshots consecutivos disponibles
+        assert (
+            ranking["candidates"][0]["velocity_7d"] == 50.0
+        )  # Δ entre snapshots consecutivos disponibles
 
         demand = (await admin_client.get("/v1/admin/scout/demand")).json()
         assert demand["terms"] == []
 
-    with patch(
-        "app.routers.admin._scout_lock_active", new=AsyncMock(return_value=True)
-    ):
+    with patch("app.routers.admin._scout_lock_active", new=AsyncMock(return_value=True)):
         for path in ["/v1/admin/scout/score", "/v1/admin/scout/demand/refresh"]:
             resp = await admin_client.post(path)
             assert resp.status_code == 409

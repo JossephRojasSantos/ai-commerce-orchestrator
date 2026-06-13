@@ -1,0 +1,193 @@
+"""Señales y ranking del Product Scout (feature 014, research R3/R4)."""
+
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import structlog
+from sqlalchemy import func, select
+
+from app.config import settings
+from app.models.scout import ScoutSignal, ScoutSnapshot
+
+logger = structlog.get_logger()
+
+VELOCITY_WINDOW_DAYS = 7
+
+
+def _insert(db):
+    """insert con ON CONFLICT del dialecto activo (postgres en prod, sqlite en tests)."""
+    if db.get_bind().dialect.name == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert as ins
+    else:
+        from sqlalchemy.dialects.postgresql import insert as ins
+    return ins
+
+
+def business_today() -> date:
+    """Fecha de negocio (Colombia, UTC-5) — los snapshots se agrupan por este día."""
+    return datetime.now(ZoneInfo("America/Bogota")).date()
+
+
+def margin_pct(suggested: float | None, cost: float, freight: int | None = None) -> float | None:
+    """(sugerido − costo − flete) / sugerido × 100; None sin precio sugerido (FR-004)."""
+    if not suggested or suggested <= 0:
+        return None
+    fr = settings.SCOUT_FREIGHT_COST if freight is None else freight
+    return round((float(suggested) - float(cost) - fr) / float(suggested) * 100, 2)
+
+
+def velocity_from_stocks(stocks_by_date: list[tuple[date, int]]) -> float | None:
+    """Media de max(0, Δstock) entre días consecutivos con datos (FR-003, R3).
+
+    Restock (Δ>0) cuenta como día sin venta (0). None con < 2 snapshots.
+    """
+    if len(stocks_by_date) < 2:
+        return None
+    ordered = sorted(stocks_by_date)
+    drops = [
+        max(0, prev_stock - curr_stock)
+        for (_, prev_stock), (_, curr_stock) in zip(ordered, ordered[1:], strict=False)
+    ]
+    return round(sum(drops) / len(drops), 2)
+
+
+async def compute_signals(db) -> int:
+    """Recalcula scout_signal para todos los productos con snapshots recientes.
+
+    Devuelve el nº de señales escritas. Solo lee snapshots (histórico intacto).
+    """
+    today = business_today()
+    window_start = today - timedelta(days=VELOCITY_WINDOW_DAYS)
+
+    rows = (
+        await db.execute(
+            select(
+                ScoutSnapshot.dropi_product_id,
+                ScoutSnapshot.snapshot_date,
+                ScoutSnapshot.stock_total,
+                ScoutSnapshot.cost_price,
+                ScoutSnapshot.suggested_price,
+                ScoutSnapshot.dropi_created_at,
+            ).where(ScoutSnapshot.snapshot_date >= window_start)
+        )
+    ).all()
+    if not rows:
+        return 0
+
+    by_product: dict[int, list] = defaultdict(list)
+    for r in rows:
+        by_product[r.dropi_product_id].append(r)
+
+    signals = []
+    for pid, snaps in by_product.items():
+        latest = max(snaps, key=lambda s: s.snapshot_date)
+        m = margin_pct(latest.suggested_price, latest.cost_price)
+        vel = velocity_from_stocks([(s.snapshot_date, s.stock_total) for s in snaps])
+        is_novelty = bool(
+            latest.dropi_created_at
+            and _aware(latest.dropi_created_at)
+            >= datetime.now(UTC) - timedelta(days=settings.SCOUT_NOVELTY_DAYS)
+            and latest.stock_total >= settings.SCOUT_NOVELTY_STOCK
+        )
+        signals.append(
+            {
+                "dropi_product_id": pid,
+                "margin_pct": m,
+                "velocity_7d": vel,
+                "is_novelty": is_novelty,
+                "is_viable": m is not None and m > 0,  # FR-005
+                "last_seen_date": latest.snapshot_date,
+                "computed_at": datetime.now(UTC),
+            }
+        )
+
+    # rank_score: min-max sobre el conjunto viable del día (data-model.md)
+    viable = [s for s in signals if s["is_viable"]]
+    margins = [s["margin_pct"] for s in viable]
+    vels = [s["velocity_7d"] or 0.0 for s in viable]
+
+    def norm(value: float, values: list[float]) -> float:
+        lo, hi = min(values), max(values)
+        return 0.5 if hi == lo else (value - lo) / (hi - lo)
+
+    for s in signals:
+        if not s["is_viable"]:
+            s["rank_score"] = 0.0
+            continue
+        s["rank_score"] = round(
+            0.5 * norm(s["margin_pct"], margins)
+            + 0.4 * norm(s["velocity_7d"] or 0.0, vels)
+            + 0.1 * (1.0 if s["is_novelty"] else 0.0),
+            4,
+        )
+
+    stmt = _insert(db)(ScoutSignal).values(signals)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["dropi_product_id"],
+        set_={c: stmt.excluded[c] for c in signals[0] if c != "dropi_product_id"},
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return len(signals)
+
+
+async def upsert_snapshot(db, product: dict, snapshot_date: date) -> None:
+    """Upsert del snapshot del día (UNIQUE dropi_product_id+snapshot_date — FR-002)."""
+    from app.clients.dropi import first_category, stock_total
+
+    user = product.get("user") or {}
+    plan = (user.get("plan") or {}).get("name") if isinstance(user.get("plan"), dict) else None
+    desc = _strip_html(product.get("description") or "")[:500] or None
+    created_raw = product.get("created_at")
+    dropi_created = _parse_dt(created_raw) if created_raw else None
+
+    values = {
+        "dropi_product_id": int(product["id"]),
+        "snapshot_date": snapshot_date,
+        "name": product.get("name") or "",
+        "category": first_category(product),
+        "supplier_name": user.get("store_name") or user.get("name"),
+        "supplier_plan": plan,
+        "cost_price": float(product.get("sale_price") or 0),
+        "suggested_price": float(product["suggested_price"])
+        if product.get("suggested_price")
+        else None,
+        "stock_total": stock_total(product),
+        "description_excerpt": desc,
+        "dropi_created_at": dropi_created,
+    }
+    stmt = _insert(db)(ScoutSnapshot).values(**values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["dropi_product_id", "snapshot_date"],
+        set_={k: v for k, v in values.items() if k not in ("dropi_product_id", "snapshot_date")},
+    )
+    await db.execute(stmt)
+
+
+def _aware(dt: datetime) -> datetime:
+    """Normaliza datetimes naive (sqlite en tests) a UTC."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def _strip_html(text: str) -> str:
+    import re
+
+    return re.sub(r"<[^>]+>", " ", text).replace("\xa0", " ").strip()
+
+
+def _parse_dt(raw: str) -> datetime | None:
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+async def latest_snapshot_count(db) -> int:
+    today = business_today()
+    return (
+        await db.execute(
+            select(func.count(ScoutSnapshot.id)).where(ScoutSnapshot.snapshot_date == today)
+        )
+    ).scalar() or 0

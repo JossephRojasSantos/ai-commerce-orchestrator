@@ -184,6 +184,141 @@ def _parse_dt(raw: str) -> datetime | None:
         return None
 
 
+PERIOD_DAYS = {"today": 1, "7d": 7, "30d": 30}
+
+DROPI_PRODUCT_URL = "https://app.dropi.co/dashboard/product-details/{id}"
+
+
+async def get_ranking(
+    db,
+    category: str | None = None,
+    period: str = "7d",
+    include_nonviable: bool = False,
+    limit: int = 100,
+) -> dict:
+    """Ranking de candidatos: señales + último snapshot + score IA (FR-007/013).
+
+    El DTO jamás incluye credenciales ni URLs internas del proveedor (FR-014).
+    """
+    from app.models.scout import ScoutAiScore
+
+    max_date = (await db.execute(select(func.max(ScoutSignal.last_seen_date)))).scalar()
+    if max_date is None:
+        return {"computed_at": None, "candidates": [], "categories": []}
+
+    q = (
+        select(ScoutSignal, ScoutSnapshot, ScoutAiScore)
+        .join(
+            ScoutSnapshot,
+            (ScoutSnapshot.dropi_product_id == ScoutSignal.dropi_product_id)
+            & (ScoutSnapshot.snapshot_date == ScoutSignal.last_seen_date),
+        )
+        .outerjoin(ScoutAiScore, ScoutAiScore.dropi_product_id == ScoutSignal.dropi_product_id)
+        .where(ScoutSignal.last_seen_date == max_date)  # inactivos fuera (edge case)
+        .order_by(ScoutSignal.rank_score.desc().nullslast())
+        .limit(limit)
+    )
+    if not include_nonviable:
+        q = q.where(ScoutSignal.is_viable.is_(True))
+    if category:
+        q = q.where(ScoutSnapshot.category == category)
+
+    rows = (await db.execute(q)).all()
+
+    # velocidad del período pedido, calculada en vivo solo para los candidatos listados
+    days = PERIOD_DAYS.get(period, 7)
+    pids = [sig.dropi_product_id for sig, _, _ in rows]
+    period_velocity: dict[int, float | None] = {}
+    if pids and days != VELOCITY_WINDOW_DAYS:
+        snaps = (
+            await db.execute(
+                select(
+                    ScoutSnapshot.dropi_product_id,
+                    ScoutSnapshot.snapshot_date,
+                    ScoutSnapshot.stock_total,
+                ).where(
+                    ScoutSnapshot.dropi_product_id.in_(pids),
+                    ScoutSnapshot.snapshot_date >= max_date - timedelta(days=days),
+                )
+            )
+        ).all()
+        grouped: dict[int, list] = defaultdict(list)
+        for r in snaps:
+            grouped[r.dropi_product_id].append((r.snapshot_date, r.stock_total))
+        period_velocity = {pid: velocity_from_stocks(v) for pid, v in grouped.items()}
+
+    candidates = []
+    for sig, snap, ai in rows:
+        vel = period_velocity.get(sig.dropi_product_id, sig.velocity_7d)
+        candidates.append(
+            {
+                "dropi_product_id": sig.dropi_product_id,
+                "name": snap.name,
+                "category": snap.category,
+                "supplier": snap.supplier_name,
+                "cost_price": float(snap.cost_price),
+                "suggested_price": float(snap.suggested_price) if snap.suggested_price else None,
+                "margin_pct": float(sig.margin_pct) if sig.margin_pct is not None else None,
+                "velocity_7d": float(vel) if vel is not None else None,
+                "is_novelty": bool(sig.is_novelty),
+                "is_viable": bool(sig.is_viable),
+                "rank_score": float(sig.rank_score) if sig.rank_score is not None else None,
+                "ai": {"score": ai.score, "reason": ai.reason} if ai else None,
+                "dropi_url": DROPI_PRODUCT_URL.format(id=sig.dropi_product_id),
+                "stock_total": snap.stock_total,
+                "last_seen_date": str(sig.last_seen_date),
+            }
+        )
+
+    cats = (
+        (
+            await db.execute(
+                select(ScoutSnapshot.category)
+                .where(ScoutSnapshot.snapshot_date == max_date, ScoutSnapshot.category.isnot(None))
+                .distinct()
+                .order_by(ScoutSnapshot.category)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    computed = (await db.execute(select(func.max(ScoutSignal.computed_at)))).scalar()
+    return {
+        "computed_at": computed.isoformat() if computed else None,
+        "candidates": candidates,
+        "categories": list(cats),
+    }
+
+
+async def list_runs(db, limit: int = 10) -> list[dict]:
+    """Últimas ejecuciones (ingest/score/demand) para diagnóstico (FR-015)."""
+    from app.models.scout import ScoutIngestRun
+
+    rows = (
+        (
+            await db.execute(
+                select(ScoutIngestRun).order_by(ScoutIngestRun.id.desc()).limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "kind": r.kind,
+            "status": r.status,
+            "processed": r.processed,
+            "failed": r.failed,
+            "error": r.error,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+        }
+        for r in rows
+    ]
+
+
 async def latest_snapshot_count(db) -> int:
     today = business_today()
     return (

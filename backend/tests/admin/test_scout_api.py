@@ -74,7 +74,8 @@ async def test_ranking_excludes_nonviable_and_orders(scout_db, monkeypatch):
     assert c["margin_pct"] == pytest.approx(37.94, abs=0.01)
     assert c["velocity_7d"] == 30.0
     assert c["ai"] is None  # sin evaluar (FR-010)
-    assert c["dropi_url"].endswith("/1")
+    # incluye id + slug del nombre (Dropi exige el slug, sin él redirige a /home)
+    assert c["dropi_url"].endswith("/1/freidora-aire-4l")
     # FR-014: sin credenciales en el payload
     assert "token" not in str(out).lower() and "integration-key" not in str(out).lower()
 

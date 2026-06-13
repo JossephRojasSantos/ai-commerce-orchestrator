@@ -195,7 +195,26 @@ def _parse_dt(raw: str) -> datetime | None:
 
 PERIOD_DAYS = {"today": 1, "7d": 7, "30d": 30}
 
-DROPI_PRODUCT_URL = "https://app.dropi.co/dashboard/product-details/{id}"
+DROPI_PRODUCT_URL = "https://app.dropi.co/dashboard/product-details/{id}/{slug}"
+
+
+def _slugify(name: str) -> str:
+    """Slug estilo Dropi: minúsculas, sin tildes, no-alfanumérico → guion.
+
+    El detalle de producto de Dropi exige el slug en la URL; sin él redirige
+    a /home (verificado en vivo). Se deriva del nombre del producto.
+    """
+    import re
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", (name or "").lower())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s or "producto"
+
+
+def dropi_product_url(product_id: int, name: str) -> str:
+    return DROPI_PRODUCT_URL.format(id=product_id, slug=_slugify(name))
 
 
 async def get_ranking(
@@ -273,7 +292,7 @@ async def get_ranking(
                 "is_viable": bool(sig.is_viable),
                 "rank_score": float(sig.rank_score) if sig.rank_score is not None else None,
                 "ai": {"score": ai.score, "reason": ai.reason} if ai else None,
-                "dropi_url": DROPI_PRODUCT_URL.format(id=sig.dropi_product_id),
+                "dropi_url": dropi_product_url(sig.dropi_product_id, snap.name),
                 "stock_total": snap.stock_total,
                 "last_seen_date": str(sig.last_seen_date),
             }

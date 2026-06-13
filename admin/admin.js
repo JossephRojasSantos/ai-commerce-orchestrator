@@ -637,23 +637,28 @@
           <option value="30d">Últimos 30 días</option>
         </select>
         <button type="button" class="btn-primary" id="scout-ingest">📥 Capturar catálogo</button>
+        <button type="button" class="btn-primary" id="scout-score">🤖 Evaluar con IA</button>
         <span id="scout-run-msg" aria-live="polite"></span>
       </div>
       <div id="scout-body">Cargando…</div>
       <div id="scout-demand"></div>`;
 
-    $('scout-ingest').addEventListener('click', async () => {
-      $('scout-ingest').disabled = true;
-      $('scout-run-msg').textContent = 'Lanzando captura…';
-      try {
-        await apiFetch('/scout/ingest', { method: 'POST' });
-        $('scout-run-msg').textContent = '⏳ Captura en curso — puede tardar varios minutos';
-      } catch (e) {
-        $('scout-run-msg').textContent =
-          e.message === 'already_running' ? '⏳ Ya hay una captura en curso' : 'No se pudo lanzar la captura';
-        $('scout-ingest').disabled = false;
-      }
-    });
+    const trigger = (btnId, path, runningMsg) => {
+      $(btnId).addEventListener('click', async () => {
+        $(btnId).disabled = true;
+        $('scout-run-msg').textContent = 'Lanzando…';
+        try {
+          await apiFetch(path, { method: 'POST' });
+          $('scout-run-msg').textContent = runningMsg + ' — consulta el estado en "Última ejecución" al recargar';
+        } catch (e) {
+          $('scout-run-msg').textContent =
+            e.message === 'already_running' ? '⏳ Ya hay una ejecución en curso' : 'No se pudo lanzar';
+          $(btnId).disabled = false;
+        }
+      });
+    };
+    trigger('scout-ingest', '/scout/ingest', '⏳ Captura en curso (varios minutos)');
+    trigger('scout-score', '/scout/score', '🤖 Evaluación IA en curso — solo top candidatos, costo acotado');
 
     try {
       const q = new URLSearchParams({ period });

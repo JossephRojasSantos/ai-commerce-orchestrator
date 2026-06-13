@@ -162,6 +162,12 @@ def _order_dto(o: dict) -> dict:
         "dropi_order_id": str(metas.get("_dropi_order_id", "")) or None,
         "dropi_note": dropi_meta if dropi_meta and dropi_meta != "Yes" else None,
         "cod_modal": str(metas.get("_tm_cod_modal", "")) == "1",
+        # Estado de fulfillment sincronizado desde Dropi (feature 016)
+        "dropi_status": str(metas.get("_dropi_status", "")) or None,
+        "dropi_carrier": str(metas.get("_dropi_carrier", "")) or None,
+        "dropi_guide": str(metas.get("_dropi_guide", "")) or None,
+        "dropi_guide_url": str(metas.get("_dropi_guide_url", "")) or None,
+        "dropi_synced_at": str(metas.get("_dropi_synced_at", "")) or None,
     }
 
 
@@ -181,6 +187,22 @@ async def list_orders(
     except (WCClientError, WCServerError):
         raise HTTPException(status_code=502, detail="store_unavailable") from None
     return {"items": [_order_dto(o) for o in items], "total": total, "page": page}
+
+
+@router.post("/orders/sync", status_code=202)
+async def orders_sync_trigger(_: str = Depends(require_admin_session)) -> dict:
+    """Dispara la sincronización Dropi → WooCommerce en background (feature 016)."""
+    import asyncio
+
+    from app.config import settings
+    from app.workers.dropi_order_sync import SYNC_LOCK_KEY, run_sync_locked
+
+    if not settings.DROPI_WC_INTEGRATION_KEY:
+        raise HTTPException(status_code=503, detail="dropi_sync_disabled") from None
+    if await _scout_lock_active(SYNC_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_sync_locked())
+    return {"status": "running", "kind": "order_sync"}
 
 
 @router.get("/orders/{order_id}")

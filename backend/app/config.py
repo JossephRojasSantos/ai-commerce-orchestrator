@@ -92,10 +92,17 @@ class Settings(BaseSettings):
     WA_HUMAN_PAUSE_HOURS: int = 12  # pausa del bot tras respuesta manual
 
     # Product Scout — catálogo Dropi (feature 014)
-    DROPI_INTEGRATION_KEY: str = ""  # token de integración; si vacío, ingesta deshabilitada
+    DROPI_INTEGRATION_KEY: str = ""  # token de integración (Chatbot Agents); catálogo/scout
     DROPI_API_BASE: str = "https://api.dropi.co/integrations"
     # El WAF de Dropi rechaza UAs de CLI/librerías; UA tipo WordPress validado (research R1)
     DROPI_USER_AGENT: str = "WordPress/6.7; https://tiendamagica.shop"
+    # Sync de pedidos Dropi → WooCommerce (feature 016).
+    # Token de la integración WOOCOMERCE de Dropi (distinto al de Scout). Vacío = sync deshabilitado.
+    DROPI_WC_INTEGRATION_KEY: str = ""
+    DROPI_ORDERS_FETCH: int = 200  # result_number en /orders/myorders por corrida de sync
+    # Si True, además de escribir metadatos transiciona el estado de la orden WC
+    # (puede disparar emails/automatizaciones de WooCommerce). False = solo metadatos.
+    DROPI_SYNC_WC_STATUS: bool = True
     SCOUT_FREIGHT_COST: int = 12000  # flete estimado COP para margen
     SCOUT_TOP_N: int = 30  # candidatos enviados al scoring IA
     SCOUT_NOVELTY_DAYS: int = 14

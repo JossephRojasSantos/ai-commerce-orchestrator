@@ -749,7 +749,7 @@
               msg.className = 'scout-add-msg ok';
             } else {
               const noImg = r.images_imported === false ? ' (sin fotos — agrégalas en el producto)' : '';
-              msg.innerHTML = '✅ Agregado como borrador' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
+              msg.innerHTML = '✅ Publicado en la tienda' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
               msg.className = 'scout-add-msg ok';
             }
             btn.textContent = '✓ Agregado';

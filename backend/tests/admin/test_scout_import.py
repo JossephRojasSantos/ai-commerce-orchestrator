@@ -49,7 +49,7 @@ async def test_import_creates_product_with_dropi_meta():
     payload = wc.create_product.call_args.args[0]
     assert payload["sku"] == "LCT0001"
     assert payload["regular_price"] == "18500"  # precio sugerido
-    assert payload["status"] == "draft"
+    assert payload["status"] == "publish"
     assert payload["stock_quantity"] == 150
     # imagen con urlS3 → URL absoluta, espacios codificados
     assert payload["images"][0]["src"].endswith("foto%20uno.png")

@@ -212,3 +212,27 @@ async def test_media_store_missing_returns_none():
 
     with patch.object(media_store, "_redis", return_value=FakeRedis()):
         assert await media_store.get_image("nope") is None
+
+
+@pytest.mark.asyncio
+async def test_media_id_has_extension_for_wp():
+    """El id debe terminar en extensión de imagen (WP la exige al hacer sideload)."""
+    from app.services.admin import media_store
+
+    store = {}
+
+    class FakeRedis:
+        async def set(self, k, v, ex=None):
+            store[k] = v
+
+        async def get(self, k):
+            return store.get(k)
+
+        async def aclose(self):
+            pass
+
+    with patch.object(media_store, "_redis", return_value=FakeRedis()):
+        mid = await media_store.store_image(b"x", "image/jpeg")
+        assert mid.endswith(".jpg")
+        mid2 = await media_store.store_image(b"x", "image/webp")
+        assert mid2.endswith(".webp")

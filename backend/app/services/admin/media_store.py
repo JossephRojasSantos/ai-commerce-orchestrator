@@ -22,9 +22,16 @@ def _redis():
     return aioredis.from_url(settings.REDIS_URL, decode_responses=False)
 
 
+_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+
+
 async def store_image(content: bytes, mime: str) -> str:
-    """Guarda el creativo y devuelve su id (uuid)."""
-    media_id = uuid.uuid4().hex
+    """Guarda el creativo y devuelve su id con extensión (ej. 'abc123.png').
+
+    WooCommerce/WP deriva el tipo de archivo de la extensión de la URL al hacer
+    sideload; sin ella rechaza la subida ('tipo de archivo no permitido').
+    """
+    media_id = f"{uuid.uuid4().hex}.{_EXT.get(mime, 'png')}"
     r = _redis()
     try:
         # value = mime\n + bytes

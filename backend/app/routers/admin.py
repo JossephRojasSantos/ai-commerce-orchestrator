@@ -520,3 +520,15 @@ async def scout_ingest_trigger(_: str = Depends(require_admin_session)) -> dict:
         raise HTTPException(status_code=409, detail="already_running") from None
     asyncio.get_running_loop().create_task(run_ingest_locked())
     return {"status": "running", "kind": "ingest"}
+
+
+@router.post("/scout/score", status_code=202)
+async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
+    import asyncio
+
+    from app.services.admin.scout_score import SCORE_LOCK_KEY, run_scoring_locked
+
+    if await _scout_lock_active(SCORE_LOCK_KEY):
+        raise HTTPException(status_code=409, detail="already_running") from None
+    asyncio.get_running_loop().create_task(run_scoring_locked())
+    return {"status": "running", "kind": "score"}

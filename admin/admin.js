@@ -62,6 +62,7 @@
 
   function showApp() {
     $('login-view').setAttribute('hidden', '');
+    $('mfa-view').setAttribute('hidden', '');
     $('app-view').removeAttribute('hidden');
     const ret = sessionStorage.getItem('tm_admin_return');
     sessionStorage.removeItem('tm_admin_return');

@@ -269,3 +269,7 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
   .wa-layout { grid-template-columns: 1fr; }
   #wa-list { max-height: 30vh; }
 }
+
+/* ── Scout (feature 014) ── */
+.scout-reason { color: var(--color-text-muted); display: inline-block; max-width: 260px; }
+.scout-link { white-space: nowrap; font-size: 13px; padding: 6px 10px; }

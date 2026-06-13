@@ -622,6 +622,106 @@
     }
   }
 
+  /* ── Vista: Scout (feature 014) ── */
+  const fmtPct = (n) => (n === null || n === undefined ? '—' : n.toFixed(1) + '%');
+
+  async function viewScout() {
+    const period = sessionStorage.getItem('tm_scout_period') || '7d';
+    const category = sessionStorage.getItem('tm_scout_cat') || '';
+    content().innerHTML = `
+      <div class="toolbar">
+        <select id="scout-cat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+        <select id="scout-period" aria-label="Período de velocidad">
+          <option value="today">Hoy</option>
+          <option value="7d">Últimos 7 días</option>
+          <option value="30d">Últimos 30 días</option>
+        </select>
+        <button type="button" class="btn-primary" id="scout-ingest">📥 Capturar catálogo</button>
+        <span id="scout-run-msg" aria-live="polite"></span>
+      </div>
+      <div id="scout-body">Cargando…</div>
+      <div id="scout-demand"></div>`;
+
+    $('scout-ingest').addEventListener('click', async () => {
+      $('scout-ingest').disabled = true;
+      $('scout-run-msg').textContent = 'Lanzando captura…';
+      try {
+        await apiFetch('/scout/ingest', { method: 'POST' });
+        $('scout-run-msg').textContent = '⏳ Captura en curso — puede tardar varios minutos';
+      } catch (e) {
+        $('scout-run-msg').textContent =
+          e.message === 'already_running' ? '⏳ Ya hay una captura en curso' : 'No se pudo lanzar la captura';
+        $('scout-ingest').disabled = false;
+      }
+    });
+
+    try {
+      const q = new URLSearchParams({ period });
+      if (category) q.set('category', category);
+      const [data, runsData] = await Promise.all([
+        apiFetch('/scout/ranking?' + q),
+        apiFetch('/scout/runs?limit=3'),
+      ]);
+
+      const catSel = $('scout-cat');
+      data.categories.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        catSel.appendChild(opt);
+      });
+      catSel.value = category;
+      catSel.addEventListener('change', (e) => { sessionStorage.setItem('tm_scout_cat', e.target.value); viewScout(); });
+      $('scout-period').value = period;
+      $('scout-period').addEventListener('change', (e) => { sessionStorage.setItem('tm_scout_period', e.target.value); viewScout(); });
+
+      const lastRun = runsData.runs[0];
+      const runLine = lastRun
+        ? `<p><small>Última ejecución (${esc(lastRun.kind)}): ${statusBadge(lastRun.status)} · ${lastRun.processed} procesados, ${lastRun.failed} fallidos · ${fmtDate(lastRun.started_at)}</small></p>`
+        : '';
+
+      if (!data.candidates.length) {
+        $('scout-body').innerHTML =
+          runLine +
+          emptyState(
+            data.computed_at
+              ? 'Sin candidatos para este filtro'
+              : 'Primera captura del catálogo pendiente — pulsa "Capturar catálogo" para empezar a acumular datos'
+          );
+        return;
+      }
+
+      $('scout-body').innerHTML = `
+        ${runLine}
+        <div class="card"><h2>Ranking de candidatos (${data.candidates.length})</h2>
+        <p><small>Velocidad de venta <strong>estimada</strong> por disminución de stock del proveedor — Dropi no publica ventas.</small></p>
+        <table class="keep-cols">
+          <thead><tr><th>Producto</th><th>Costo</th><th>Precio sug.</th><th>Margen</th><th>Vel. est./día</th><th>IA</th><th></th></tr></thead>
+          <tbody>${data.candidates
+            .map(
+              (c) => `<tr>
+              <td>${esc(c.name)}<br><small>${esc(c.category || '—')} · ${esc(c.supplier || '')} · stock ${c.stock_total}</small>
+                ${c.is_novelty ? '<span class="badge ok">🆕 novedad</span>' : ''}
+                ${c.is_viable ? '' : '<span class="badge alert">margen ≤ 0</span>'}</td>
+              <td>${fmtCOP(c.cost_price)}</td>
+              <td>${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
+              <td>${fmtPct(c.margin_pct)}</td>
+              <td>${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
+              <td>${
+                c.ai
+                  ? `<strong>${c.ai.score}</strong>/100<br><small class="scout-reason">${esc(c.ai.reason)}</small>`
+                  : '<span class="badge">sin evaluar</span>'
+              }</td>
+              <td><a class="btn-cta scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener">Ver en Dropi</a></td>
+              </tr>`
+            )
+            .join('')}</tbody>
+        </table></div>`;
+    } catch (e) {
+      if (e.message !== 'session') $('scout-body').innerHTML = errCard('No pudimos cargar el ranking Scout');
+    }
+  }
+
   /* ── Router ── */
   const routes = {
     dashboard: viewDashboard,
@@ -630,6 +730,7 @@
     products: viewProducts,
     ai: viewAI,
     whatsapp: viewWhatsApp,
+    scout: viewScout,
   };
 
   function route() {

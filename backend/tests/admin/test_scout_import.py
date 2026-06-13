@@ -45,12 +45,7 @@ async def test_import_creates_product_with_dropi_meta():
     ):
         res = await scout_import.import_product(2175936)
 
-    assert res == {
-        "status": "created",
-        "wc_id": 555,
-        "name": "Juguete para gato raton a control",
-        "permalink": "https://t/p/555",
-    }
+    assert res["status"] == "created" and res["wc_id"] == 555 and res["images_imported"] is True
     payload = wc.create_product.call_args.args[0]
     assert payload["sku"] == "LCT0001"
     assert payload["regular_price"] == "18500"  # precio sugerido
@@ -164,3 +159,51 @@ async def test_import_endpoint_201_and_409_paths(admin_client):
     ):
         r = await admin_client.post("/v1/admin/scout/import/123")
         assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_import_retries_without_images_on_image_error():
+    """Si WC no puede bajar la foto (WAF Dropi), reintenta sin imágenes (FR resiliencia)."""
+    from app.clients.woocommerce import WCClientError
+
+    wc = AsyncMock()
+    wc.find_product_by_sku = AsyncMock(return_value=None)
+    calls = []
+
+    async def create(payload):
+        calls.append(payload)
+        if len(calls) == 1 and payload["images"]:
+            raise WCClientError(400, '{"code":"woocommerce_product_image_upload_error"}')
+        return {"id": 7, "name": "X", "permalink": "p"}
+
+    wc.create_product = create
+    with (
+        patch.object(
+            scout_import.dropi, "get_product_detail", new=AsyncMock(return_value=_detail())
+        ),
+        patch.object(scout_import, "get_wc_client", new=AsyncMock(return_value=wc)),
+        patch.object(scout_import.settings, "DROPI_INTEGRATION_KEY", "tok"),
+    ):
+        res = await scout_import.import_product(2175936)
+
+    assert res["status"] == "created" and res["images_imported"] is False
+    assert len(calls) == 2  # 1º con imágenes (falla) → 2º sin imágenes (ok)
+    assert calls[1]["images"] == []
+
+
+@pytest.mark.asyncio
+async def test_import_reraises_non_image_wc_error():
+    from app.clients.woocommerce import WCClientError
+
+    wc = AsyncMock()
+    wc.find_product_by_sku = AsyncMock(return_value=None)
+    wc.create_product = AsyncMock(side_effect=WCClientError(400, '{"code":"duplicated_sku"}'))
+    with (
+        patch.object(
+            scout_import.dropi, "get_product_detail", new=AsyncMock(return_value=_detail())
+        ),
+        patch.object(scout_import, "get_wc_client", new=AsyncMock(return_value=wc)),
+        patch.object(scout_import.settings, "DROPI_INTEGRATION_KEY", "tok"),
+    ):
+        with pytest.raises(WCClientError):
+            await scout_import.import_product(2175936)

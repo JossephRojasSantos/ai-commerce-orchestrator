@@ -273,3 +273,31 @@ async def test_scout_runs_and_ranking_period_endpoints(scout_factory, monkeypatc
         for path in ["/v1/admin/scout/score", "/v1/admin/scout/demand/refresh"]:
             resp = await admin_client.post(path)
             assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_run_ingest_deep_offset_400_treated_as_catalog_end(scout_factory):
+    """400 de Dropi en offset profundo con datos ya capturados → run ok + señales."""
+    from app.config import settings
+    from app.workers import scout_ingest
+
+    calls = {"n": 0}
+
+    async def first_page_then_400(start, category_id=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return [_product(pid=1, stock=100)]
+        raise RuntimeError("dropi products/index failed: status=400")
+
+    with (
+        patch("app.db.base.AsyncSessionLocal", scout_factory),
+        patch.object(scout_ingest.dropi, "list_products", side_effect=first_page_then_400),
+        patch.object(settings, "DROPI_INTEGRATION_KEY", "tok"),
+    ):
+        result = await scout_ingest.run_ingest()
+
+    assert result["status"] == "ok"  # no es falla: catálogo terminó
+    assert result["processed"] == 1
+    async with scout_factory() as db:
+        signals = (await db.execute(text("SELECT count(*) FROM scout_signal"))).scalar()
+    assert signals == 1  # las señales SÍ se calcularon

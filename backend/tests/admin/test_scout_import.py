@@ -131,11 +131,15 @@ async def test_wc_create_propagates_errors():
 
     async with WooCommerceClient() as wc:
         with respx.mock:
-            respx.post(f"{settings.WC_BASE_URL}/products").mock(return_value=httpx.Response(400, text="bad"))
+            respx.post(f"{settings.WC_BASE_URL}/products").mock(
+                return_value=httpx.Response(400, text="bad")
+            )
             with pytest.raises(WCClientError):
                 await wc.create_product({})
         with respx.mock:
-            respx.post(f"{settings.WC_BASE_URL}/products").mock(return_value=httpx.Response(500, text="boom"))
+            respx.post(f"{settings.WC_BASE_URL}/products").mock(
+                return_value=httpx.Response(500, text="boom")
+            )
             with pytest.raises(WCServerError):
                 await wc.create_product({})
 
@@ -147,7 +151,9 @@ async def test_import_endpoint_201_and_409_paths(admin_client):
 
     with patch(
         "app.services.admin.scout_import.import_product",
-        new=AsyncMock(return_value={"status": "created", "wc_id": 1, "name": "X", "permalink": "p"}),
+        new=AsyncMock(
+            return_value={"status": "created", "wc_id": 1, "name": "X", "permalink": "p"}
+        ),
     ):
         r = await admin_client.post("/v1/admin/scout/import/123")
         assert r.status_code == 201 and r.json()["wc_id"] == 1

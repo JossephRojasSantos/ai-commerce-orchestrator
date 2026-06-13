@@ -540,9 +540,7 @@ async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
 
 
 @router.post("/scout/import/{dropi_product_id}", status_code=201)
-async def scout_import(
-    dropi_product_id: int, _: str = Depends(require_admin_session)
-) -> dict:
+async def scout_import(dropi_product_id: int, _: str = Depends(require_admin_session)) -> dict:
     from app.services.admin.scout_import import import_product
 
     try:

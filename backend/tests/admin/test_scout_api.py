@@ -158,8 +158,12 @@ async def test_ranking_search_multi_term(scout_db, monkeypatch):
 
     today = date(2026, 6, 13)
     monkeypatch.setattr(scout_mod, "business_today", lambda: today)
-    await upsert_snapshot(scout_db, _product(pid=1, name="Lampara Solar Jardin", cost=20000, suggested=99900), today)
-    await upsert_snapshot(scout_db, _product(pid=2, name="Audifonos Gamer BT", cost=30000, suggested=99900), today)
+    await upsert_snapshot(
+        scout_db, _product(pid=1, name="Lampara Solar Jardin", cost=20000, suggested=99900), today
+    )
+    await upsert_snapshot(
+        scout_db, _product(pid=2, name="Audifonos Gamer BT", cost=30000, suggested=99900), today
+    )
     await scout_db.commit()
     await scout_mod.compute_signals(scout_db)
 

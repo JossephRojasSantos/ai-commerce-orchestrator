@@ -152,6 +152,16 @@
   const errCard = (msg) => `<div class="card"><p class="error">⚠️ ${esc(msg)}</p></div>`;
   const emptyState = (msg) => `<div class="empty">${esc(msg)}</div>`;
   const statusBadge = (s) => `<span class="badge ${esc(s)}">${esc(s)}</span>`;
+  // Celda de envío Dropi en la tabla de pedidos (feature 016)
+  function dropiShipCell(o) {
+    if (o.dropi_status) {
+      const carrier = o.dropi_carrier ? `<br><small>${esc(o.dropi_carrier)}</small>` : '';
+      return `<span class="badge dropi">${esc(o.dropi_status)}</span>${carrier}`;
+    }
+    if (o.dropi_synced) return '✅ ' + esc(o.dropi_order_id || '');
+    if (o.dropi_note) return '⚠️';
+    return '—';
+  }
 
   function bars(entries, total, cls = '') {
     if (!entries.length) return emptyState('Sin datos en el período');
@@ -220,13 +230,36 @@
         </select>
         <input type="search" id="orders-search" placeholder="Buscar nombre o teléfono…">
         <button type="button" class="btn-primary" id="orders-go">Buscar</button>
+        <button type="button" class="btn-ghost" id="orders-sync" title="Traer estado/envío desde Dropi">🔄 Sincronizar Dropi</button>
+        <span id="orders-sync-msg" class="login-sub"></span>
       </div>
       <div id="orders-body">Cargando…</div>
       <div id="orders-detail"></div>`;
     $('orders-go').addEventListener('click', () => { ordersPage = 1; loadOrders(); });
     $('orders-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') { ordersPage = 1; loadOrders(); } });
     $('orders-status').addEventListener('change', () => { ordersPage = 1; loadOrders(); });
+    $('orders-sync').addEventListener('click', syncDropiOrders);
     loadOrders();
+  }
+
+  async function syncDropiOrders() {
+    const btn = $('orders-sync');
+    const msg = $('orders-sync-msg');
+    btn.disabled = true;
+    msg.textContent = 'Sincronizando con Dropi…';
+    try {
+      await apiFetch('/orders/sync', { method: 'POST' });
+      // El sync corre en background; refrescamos tras unos segundos.
+      setTimeout(() => { msg.textContent = '✅ Sincronización en curso — actualizando…'; loadOrders(); }, 4000);
+      setTimeout(() => { msg.textContent = ''; loadOrders(); }, 9000);
+    } catch (e) {
+      msg.textContent =
+        e.message === 'already_running' ? '⏳ Ya hay un sync en curso'
+        : e.message === 'dropi_sync_disabled' ? '⚠️ Sync Dropi no configurado'
+        : 'No se pudo iniciar el sync';
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   async function loadOrders() {
@@ -241,7 +274,7 @@
       if (!data.items.length) { $('orders-body').innerHTML = emptyState('Sin pedidos que coincidan'); return; }
       $('orders-body').innerHTML = `
         <table>
-          <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Pago</th><th>Dropi</th><th>Fecha</th></tr></thead>
+          <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Pago</th><th>Envío Dropi</th><th>Fecha</th></tr></thead>
           <tbody>${data.items
             .map(
               (o) => `<tr class="clickable" data-order="${o.id}">
@@ -250,7 +283,7 @@
               <td>${fmtCOP(o.total)}</td>
               <td>${statusBadge(o.status)}</td>
               <td>${o.payment_method === 'cod' ? '🏠 COD' : '💳'}</td>
-              <td>${o.dropi_synced ? '✅ ' + esc(o.dropi_order_id || '') : o.dropi_note ? '⚠️' : '—'}</td>
+              <td>${dropiShipCell(o)}</td>
               <td>${fmtDate(o.date)}</td></tr>`
             )
             .join('')}</tbody>
@@ -281,6 +314,13 @@
           📍 ${esc(o.address)} ${esc(o.address_extra)} — ${esc(o.city)}, ${esc(o.state)}<br>
           💰 ${esc(o.payment_method_title)} · ${o.cod_modal ? 'vía modal COD' : 'checkout estándar'}<br>
           🚚 Dropi: ${o.dropi_synced ? '✅ orden ' + esc(o.dropi_order_id) : o.dropi_note ? '⚠️ ' + esc(o.dropi_note) : 'no aplica'}</p>
+          ${o.dropi_status ? `<p class="dropi-ship">
+            📦 <strong>Estado Dropi:</strong> <span class="badge dropi">${esc(o.dropi_status)}</span>
+            ${o.dropi_carrier ? ` · 🚛 ${esc(o.dropi_carrier)}` : ''}
+            ${o.dropi_guide ? ` · guía ${esc(o.dropi_guide)}` : ''}
+            ${o.dropi_guide_url ? ` · <a href="${esc(o.dropi_guide_url)}" target="_blank" rel="noopener">ver guía</a>` : ''}
+            ${o.dropi_synced_at ? `<br><small>sincronizado ${fmtDate(o.dropi_synced_at)}</small>` : ''}
+          </p>` : ''}
           <table class="keep-cols">
             <thead><tr><th>Producto</th><th>Cant.</th><th>Total</th></tr></thead>
             <tbody>${o.items.map((i) => `<tr><td>${esc(i.name)}</td><td>${i.quantity}</td><td>${fmtCOP(i.total)}</td></tr>`).join('')}</tbody>

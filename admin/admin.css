@@ -277,3 +277,24 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 .scout-add-msg { font-size: 12px; }
 .scout-add-msg.ok { color: var(--color-success, #16a34a); }
 .scout-add-msg.err { color: var(--color-danger, #dc2626); }
+
+/* ── Editor de productos (feature 015) ── */
+.prod-name.clickable { cursor: pointer; color: var(--color-primary); font-weight: 600; }
+.switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider { position: absolute; cursor: pointer; inset: 0; background: var(--color-border); border-radius: 24px; transition: .2s; }
+.switch .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+.switch input:checked + .slider { background: var(--color-success, #16a34a); }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+.switch-inline { display: inline-flex; align-items: center; gap: 6px; }
+#pe-body label { display: block; margin-top: 10px; font-weight: 600; font-size: 14px; }
+#pe-body input[type=text], #pe-body input[type=number], #pe-body textarea {
+  width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-input);
+  font-family: var(--font-body); font-size: 14px; margin-top: 4px;
+}
+#pe-body #pe-save { margin-top: 14px; }
+.pe-gallery { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.pe-thumb { position: relative; width: 96px; height: 96px; }
+.pe-thumb img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-input); border: 1px solid var(--color-border); }
+.pe-del { position: absolute; top: -6px; right: -6px; background: var(--color-danger, #dc2626); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; }
+.pe-upload-btn { display: inline-block; cursor: pointer; }

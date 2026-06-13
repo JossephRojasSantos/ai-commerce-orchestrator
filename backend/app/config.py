@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     SCOUT_PRICE_MIN: int = 30000  # rango COD atractivo (criterio scoring)
     SCOUT_PRICE_MAX: int = 150000
 
+    # Editor de productos (feature 015)
+    # Base pública del backend; WooCommerce descarga los creativos desde aquí.
+    PUBLIC_API_BASE: str = "https://api.tiendamagica.shop"
+    # Microsoft Clarity: id del proyecto para el mapa de calor (vacío = sin tracking)
+    CLARITY_PROJECT_ID: str = ""
+
     @property
     def WA_API_BASE(self) -> str:
         return f"https://graph.facebook.com/{self.WA_API_VERSION}"

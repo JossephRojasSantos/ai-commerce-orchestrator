@@ -8,7 +8,7 @@ Regla de oro: ningún endpoint devuelve meta_data crudo de WooCommerce
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 
@@ -112,6 +112,17 @@ async def logout(token: str = Depends(require_admin_session)) -> dict:
 @router.get("/me")
 async def me(_: str = Depends(require_admin_session)) -> dict:
     return {"ok": True}
+
+
+@router.get("/config")
+async def admin_config(_: str = Depends(require_admin_session)) -> dict:
+    """Config no sensible para la UI (id de Clarity para el mapa de calor)."""
+    from app.config import settings
+
+    return {
+        "clarity_project_id": settings.CLARITY_PROJECT_ID,
+        "store_url": "https://tiendamagica.shop",
+    }
 
 
 # ── Stats (US1) ──────────────────────────────────────────────
@@ -260,6 +271,22 @@ async def list_products(_: str = Depends(require_admin_session)) -> dict:
 class ProductUpdate(BaseModel):
     price: float | None = Field(default=None, gt=0)
     stock: int | None = Field(default=None, ge=0)
+    name: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=50000)
+    short_description: str | None = Field(default=None, max_length=10000)
+    visible: bool | None = None
+
+
+@router.get("/products/{product_id}")
+async def product_detail(product_id: int, _: str = Depends(require_admin_session)) -> dict:
+    try:
+        return await products_admin.get_product_detail(product_id)
+    except WCClientError as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="product_not_found") from None
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+    except WCServerError:
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
 
 
 @router.put("/products/{product_id}")
@@ -268,15 +295,66 @@ async def update_product(
     req: ProductUpdate,
     _: str = Depends(require_admin_session),
 ) -> dict:
-    if req.price is None and req.stock is None:
+    if all(
+        v is None
+        for v in (
+            req.price,
+            req.stock,
+            req.name,
+            req.description,
+            req.short_description,
+            req.visible,
+        )
+    ):
         raise HTTPException(status_code=422, detail="nothing_to_update") from None
     try:
-        return await products_admin.update_product(product_id, req.price, req.stock)
+        return await products_admin.update_product(
+            product_id,
+            price=req.price,
+            stock=req.stock,
+            name=req.name,
+            description=req.description,
+            short_description=req.short_description,
+            visible=req.visible,
+        )
     except WCClientError as exc:
         if exc.status_code == 404:
             raise HTTPException(status_code=404, detail="product_not_found") from None
         raise HTTPException(status_code=502, detail="store_unavailable") from None
     except WCServerError:
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+
+
+@router.post("/products/{product_id}/image", status_code=201)
+async def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.services.admin import media_store
+
+    if file.content_type not in media_store.ALLOWED_MIME:
+        raise HTTPException(status_code=422, detail="formato_no_soportado") from None
+    content = await file.read()
+    if len(content) > media_store.MAX_BYTES:
+        raise HTTPException(status_code=413, detail="imagen_muy_grande") from None
+    try:
+        return await products_admin.add_product_image(product_id, content, file.content_type)
+    except WCClientError as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="product_not_found") from None
+        raise HTTPException(status_code=502, detail=f"woocommerce_error: {exc.message}") from None
+    except WCServerError:
+        raise HTTPException(status_code=502, detail="store_unavailable") from None
+
+
+@router.delete("/products/{product_id}/image/{image_id}")
+async def delete_product_image(
+    product_id: int, image_id: int, _: str = Depends(require_admin_session)
+) -> dict:
+    try:
+        return await products_admin.delete_product_image(product_id, image_id)
+    except (WCClientError, WCServerError):
         raise HTTPException(status_code=502, detail="store_unavailable") from None
 
 

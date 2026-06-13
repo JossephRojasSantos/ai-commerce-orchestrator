@@ -353,7 +353,7 @@
     load();
   }
 
-  /* ── Vista: Productos ── */
+  /* ── Vista: Productos (lista) ── */
   async function viewProducts() {
     content().innerHTML = '<div id="prod-body">Cargando…</div>';
     try {
@@ -361,13 +361,14 @@
       if (!data.items.length) { $('prod-body').innerHTML = emptyState('Sin productos'); return; }
       $('prod-body').innerHTML = `
         <div class="card"><h2>Productos (${data.items.length})</h2>
+        <p><small>Haz clic en un producto para editar fotos y descripción. El interruptor lo muestra u oculta en la tienda al instante.</small></p>
         <table class="keep-cols">
-          <thead><tr><th></th><th>Producto</th><th>Precio</th><th>Stock</th><th>Margen</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Producto</th><th>Precio</th><th>Stock</th><th>Margen</th><th>Visible</th><th></th></tr></thead>
           <tbody>${data.items
             .map(
               (p) => `<tr data-prod="${p.id}">
               <td><img src="${esc(p.image)}" alt="" loading="lazy"></td>
-              <td>${esc(p.name)}<br><span class="badge ${p.origin}">${p.origin === 'dropi' ? 'Dropi' : 'Propio'}</span></td>
+              <td class="prod-name clickable" data-edit="${p.id}">${esc(p.name)}<br><span class="badge ${p.origin}">${p.origin === 'dropi' ? 'Dropi' : 'Propio'}</span></td>
               <td><input class="inline-edit" type="number" min="1" step="100" value="${p.price}" data-field="price" aria-label="Precio de ${esc(p.name)}"></td>
               <td><input class="inline-edit" type="number" min="0" step="1" value="${p.stock ?? ''}" data-field="stock" aria-label="Stock de ${esc(p.name)}"></td>
               <td>${
@@ -377,12 +378,33 @@
                     : `<span class="badge ok">${fmtCOP(p.margin)}</span>`
                   : '—'
               }</td>
-              <td><button type="button" class="btn-primary" data-save="${p.id}">Guardar</button><span class="error" data-msg="${p.id}"></span></td>
+              <td><label class="switch"><input type="checkbox" data-visible="${p.id}" ${p.status === 'publish' ? 'checked' : ''} aria-label="Visible en tienda"><span class="slider"></span></label></td>
+              <td><button type="button" class="btn-primary" data-save="${p.id}">Guardar</button>
+                  <button type="button" class="btn-ghost" data-edit="${p.id}">✏️ Editar</button>
+                  <span class="error" data-msg="${p.id}"></span></td>
               </tr>`
             )
             .join('')}</tbody>
         </table>
         <p><small>Margen = precio − costo Dropi − flete estimado. Alerta cuando ≤ 0: Dropi rechaza la orden.</small></p></div>`;
+
+      document.querySelectorAll('[data-edit]').forEach((el) =>
+        el.addEventListener('click', () => { location.hash = '#/products/' + el.dataset.edit; })
+      );
+      document.querySelectorAll('[data-visible]').forEach((chk) =>
+        chk.addEventListener('change', async () => {
+          chk.disabled = true;
+          const msg = document.querySelector(`[data-msg="${chk.dataset.visible}"]`);
+          try {
+            await apiFetch('/products/' + chk.dataset.visible, { method: 'PUT', body: JSON.stringify({ visible: chk.checked }) });
+            msg.textContent = chk.checked ? '✅ Visible' : '🙈 Oculto';
+            msg.className = 'scout-add-msg ok';
+          } catch (e) {
+            chk.checked = !chk.checked;
+            msg.textContent = 'No se pudo cambiar';
+          } finally { chk.disabled = false; }
+        })
+      );
       document.querySelectorAll('[data-save]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           const id = btn.dataset.save;
@@ -403,6 +425,117 @@
       );
     } catch (e) {
       if (e.message !== 'session') $('prod-body').innerHTML = errCard('No pudimos cargar los productos');
+    }
+  }
+
+  /* ── Vista: Editar producto (feature 015) ── */
+  let adminConfig = null;
+
+  async function viewProductEdit(id) {
+    content().innerHTML = '<div id="pe-body">Cargando…</div>';
+    try {
+      if (!adminConfig) adminConfig = await apiFetch('/config').catch(() => ({}));
+      const p = await apiFetch('/products/' + id);
+      const heat = adminConfig && adminConfig.clarity_project_id
+        ? `<a class="btn-ghost" href="https://clarity.microsoft.com/projects/view/${esc(adminConfig.clarity_project_id)}/heatmaps" target="_blank" rel="noopener">🗺️ Ver mapa de calor</a>
+           <small>En Clarity cambia entre 📱 móvil y 💻 escritorio. Filtra por la URL del producto.</small>`
+        : `<small>⚠️ Mapa de calor no configurado — falta el Project ID de Microsoft Clarity.</small>`;
+
+      $('pe-body').innerHTML = `
+        <div class="toolbar">
+          <button type="button" class="btn-ghost" id="pe-back">← Volver</button>
+          ${p.permalink ? `<a class="btn-ghost" href="${esc(p.permalink)}" target="_blank" rel="noopener">🔗 Ver en tienda</a>` : ''}
+          <label class="switch-inline"><input type="checkbox" id="pe-visible" ${p.visible ? 'checked' : ''}> Visible en tienda</label>
+          <span id="pe-msg" aria-live="polite"></span>
+        </div>
+        <div class="card">
+          <h2>Editar producto</h2>
+          <label for="pe-name">Nombre</label>
+          <input type="text" id="pe-name" value="${esc(p.name)}" maxlength="300">
+          <label for="pe-price">Precio (COP)</label>
+          <input type="number" id="pe-price" value="${p.regular_price || p.price}" min="1" step="100">
+          <label for="pe-stock">Stock</label>
+          <input type="number" id="pe-stock" value="${p.stock ?? ''}" min="0" step="1">
+          <label for="pe-short">Descripción corta</label>
+          <textarea id="pe-short" rows="2" maxlength="10000">${esc(p.short_description)}</textarea>
+          <label for="pe-desc">Descripción</label>
+          <textarea id="pe-desc" rows="8" maxlength="50000">${esc(p.description)}</textarea>
+          <button type="button" class="btn-cta" id="pe-save">Guardar cambios</button>
+        </div>
+        <div class="card">
+          <h2>Creativos (fotos)</h2>
+          <div class="pe-gallery" id="pe-gallery">${
+            p.images.length
+              ? p.images.map((im) => `<div class="pe-thumb"><img src="${esc(im.src)}" alt="" loading="lazy">${im.id ? `<button type="button" class="pe-del" data-img="${im.id}" title="Quitar">✕</button>` : ''}</div>`).join('')
+              : '<span class="empty">Sin fotos aún</span>'
+          }</div>
+          <label class="btn-primary pe-upload-btn">📤 Subir creativo<input type="file" id="pe-upload" accept="image/*" hidden></label>
+          <span id="pe-upload-msg"></span>
+          <p><small>JPG/PNG/WebP, máx 8 MB. Al guardar se refleja en la tienda si el producto está visible.</small></p>
+        </div>
+        <div class="card">
+          <h2>🗺️ Mapa de calor</h2>
+          ${heat}
+        </div>`;
+
+      $('pe-back').addEventListener('click', () => { location.hash = '#/products'; });
+
+      $('pe-visible').addEventListener('change', async (e) => {
+        try {
+          await apiFetch('/products/' + id, { method: 'PUT', body: JSON.stringify({ visible: e.target.checked }) });
+          $('pe-msg').textContent = e.target.checked ? '✅ Visible en la tienda' : '🙈 Oculto';
+        } catch { e.target.checked = !e.target.checked; $('pe-msg').textContent = 'No se pudo cambiar'; }
+      });
+
+      $('pe-save').addEventListener('click', async () => {
+        $('pe-save').disabled = true;
+        $('pe-msg').textContent = 'Guardando…';
+        const body = {
+          name: $('pe-name').value.trim(),
+          price: parseFloat($('pe-price').value) || undefined,
+          description: $('pe-desc').value,
+          short_description: $('pe-short').value,
+        };
+        const stockRaw = $('pe-stock').value;
+        if (stockRaw !== '') body.stock = parseInt(stockRaw, 10);
+        try {
+          await apiFetch('/products/' + id, { method: 'PUT', body: JSON.stringify(body) });
+          $('pe-msg').textContent = '✅ Guardado — reflejado en la tienda';
+        } catch (err) {
+          $('pe-msg').textContent = 'No se pudo guardar: ' + err.message;
+        } finally { $('pe-save').disabled = false; }
+      });
+
+      $('pe-upload').addEventListener('change', async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        $('pe-upload-msg').textContent = '⏳ Subiendo…';
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+          // apiFetch fuerza JSON; subo con fetch directo conservando el Bearer
+          const resp = await fetch(API + '/products/' + id + '/image', {
+            method: 'POST', headers: { Authorization: 'Bearer ' + getToken() }, body: fd,
+          });
+          if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).message || 'error');
+          $('pe-upload-msg').textContent = '✅ Foto agregada';
+          viewProductEdit(id);
+        } catch (err) {
+          $('pe-upload-msg').textContent = 'No se pudo subir (¿formato o tamaño?)';
+        }
+      });
+
+      document.querySelectorAll('[data-img]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            await apiFetch(`/products/${id}/image/${btn.dataset.img}`, { method: 'DELETE' });
+            viewProductEdit(id);
+          } catch { btn.disabled = false; }
+        })
+      );
+    } catch (e) {
+      if (e.message !== 'session') $('pe-body').innerHTML = errCard('No pudimos cargar el producto');
     }
   }
 
@@ -831,7 +964,16 @@
 
   function route() {
     if (!getToken()) { showLogin(); return; }
-    const name = (location.hash || '#/dashboard').replace('#/', '') || 'dashboard';
+    const path = (location.hash || '#/dashboard').replace('#/', '') || 'dashboard';
+    const [name, param] = path.split('/');
+    // Ruta anidada: products/{id} → editor del producto
+    if (name === 'products' && param) {
+      document.querySelectorAll('#sidenav a').forEach((a) =>
+        a.classList.toggle('active', a.dataset.nav === 'products')
+      );
+      viewProductEdit(param);
+      return;
+    }
     const view = routes[name] || viewDashboard;
     document.querySelectorAll('#sidenav a').forEach((a) =>
       a.classList.toggle('active', a.dataset.nav === name)

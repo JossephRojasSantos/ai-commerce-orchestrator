@@ -68,8 +68,19 @@ def map_status(dropi_status: str | None) -> str | None:
         return "cancelled"
     if any(
         t in norm
-        for t in ("TRANSITO", "REPARTO", "DESPACH", "ENVIAD", "CAMINO", "BODEGA",
-                  "GUIA", "EMPACAD", "PREPARAND", "CONFIRMAD", "PROCES")
+        for t in (
+            "TRANSITO",
+            "REPARTO",
+            "DESPACH",
+            "ENVIAD",
+            "CAMINO",
+            "BODEGA",
+            "GUIA",
+            "EMPACAD",
+            "PREPARAND",
+            "CONFIRMAD",
+            "PROCES",
+        )
     ):
         return "processing"
     if "PENDIENTE" in norm or "NOVEDAD" in norm:

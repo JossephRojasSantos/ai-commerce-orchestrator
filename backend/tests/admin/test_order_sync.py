@@ -28,7 +28,9 @@ def _dropi_order(dropi_id, wc_id, status, carrier="COORDINADORA", guide=None, gu
 @respx.mock
 async def test_list_orders_uses_wc_token_and_result_number():
     route = respx.get(f"{settings.DROPI_API_BASE}/orders/myorders").mock(
-        return_value=httpx.Response(200, json={"isSuccess": True, "objects": [_dropi_order(1, 97, "PENDIENTE")]})
+        return_value=httpx.Response(
+            200, json={"isSuccess": True, "objects": [_dropi_order(1, 97, "PENDIENTE")]}
+        )
     )
     with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"):
         out = await dropi.list_orders(result_number=50)
@@ -138,9 +140,11 @@ async def test_sync_orders_skips_unlinked_and_updates_linked():
     fake_wc = AsyncMock()
     fake_wc.get_order_raw.return_value = _wc_order(status="processing")
     fake_wc.update_order.return_value = {}
-    with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"), \
-         patch.object(order_sync.dropi, "list_orders", AsyncMock(return_value=orders)), \
-         patch.object(order_sync, "get_wc_client", AsyncMock(return_value=fake_wc)):
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch.object(order_sync.dropi, "list_orders", AsyncMock(return_value=orders)),
+        patch.object(order_sync, "get_wc_client", AsyncMock(return_value=fake_wc)),
+    ):
         result = await order_sync.sync_orders()
     assert result["unlinked"] == 1
     assert result["updated"] == 1

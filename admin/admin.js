@@ -401,6 +401,71 @@
     }
   }
 
+  /* ── Vista: Pedidos Dropi (feature 017) ── */
+  async function viewDropiOrders() {
+    content().innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1>🚚 Pedidos Dropi</h1>
+          <p class="sub">Pedidos directos de Dropi — incluye los que no están en la tienda</p>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <button type="button" class="btn-ghost" id="dropi-refresh">🔄 Refrescar</button>
+          <button type="button" class="btn-primary" id="dropi-sync" title="Volcar estado/guía a las órdenes de la tienda">⬇️ Sincronizar a tienda</button>
+          <span id="dropi-msg" class="login-sub"></span>
+        </div>
+      </div>
+      <div id="dropi-body">Cargando…</div>`;
+    $('dropi-refresh').addEventListener('click', viewDropiOrders);
+    $('dropi-sync').addEventListener('click', async () => {
+      const btn = $('dropi-sync');
+      const msg = $('dropi-msg');
+      btn.disabled = true;
+      msg.textContent = 'Sincronizando a la tienda…';
+      try {
+        await apiFetch('/orders/sync', { method: 'POST' });
+        msg.textContent = '✅ Sync en curso — revisa Pedidos en unos segundos';
+      } catch (e) {
+        msg.textContent =
+          e.message === 'already_running' ? '⏳ Ya hay un sync en curso'
+          : e.message === 'dropi_sync_disabled' ? '⚠️ Sync Dropi no configurado'
+          : 'No se pudo iniciar el sync';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    try {
+      const data = await apiFetch('/dropi/orders');
+      if (!data.items.length) { $('dropi-body').innerHTML = emptyState('Sin pedidos en Dropi'); return; }
+      $('dropi-body').innerHTML = `
+        <p class="login-sub">${data.total} pedidos en Dropi · ${data.in_store} también en la tienda · ${data.total - data.in_store} solo en Dropi</p>
+        <table>
+          <thead><tr><th>Dropi #</th><th>En tienda</th><th>Cliente</th><th>Ciudad</th><th>Total</th><th>Estado</th><th>Transportadora</th><th>Guía</th><th>Fecha</th></tr></thead>
+          <tbody>${data.items
+            .map(
+              (o) => `<tr>
+              <td>${o.dropi_order_id}</td>
+              <td>${o.in_store ? '🏬 #' + esc(String(o.wc_order_id)) : '<span class="badge dropi">solo Dropi</span>'}</td>
+              <td>${esc(o.customer || '—')}<br><small>${esc(o.phone || '')}</small></td>
+              <td>${esc(o.city || '—')}${o.state ? ', ' + esc(o.state) : ''}</td>
+              <td>${o.total != null ? fmtCOP(o.total) : '—'}</td>
+              <td>${o.status ? '<span class="badge dropi">' + esc(o.status) + '</span>' : '—'}</td>
+              <td>${esc(o.carrier || '—')}</td>
+              <td>${o.guide_url ? `<a href="${esc(o.guide_url)}" target="_blank" rel="noopener">guía</a>` : esc(o.guide || '—')}</td>
+              <td>${fmtDate(o.created_at)}</td></tr>`
+            )
+            .join('')}</tbody>
+        </table>`;
+    } catch (e) {
+      if (e.message === 'session') return;
+      $('dropi-body').innerHTML = errCard(
+        e.message === 'dropi_sync_disabled' ? 'Sync Dropi no configurado (falta DROPI_WC_INTEGRATION_KEY)'
+        : e.message === 'dropi_unavailable' ? 'No pudimos consultar Dropi (red o WAF)'
+        : 'No pudimos cargar los pedidos de Dropi'
+      );
+    }
+  }
+
   /* ── Vista: Clientes ── */
   async function viewCustomers() {
     content().innerHTML = `
@@ -1052,6 +1117,7 @@
   const routes = {
     dashboard: viewDashboard,
     orders: viewOrders,
+    dropi: viewDropiOrders,
     customers: viewCustomers,
     products: viewProducts,
     ai: viewAI,

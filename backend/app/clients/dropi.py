@@ -125,6 +125,31 @@ def order_sync_fields(o: dict) -> dict:
     }
 
 
+def order_display_dto(o: dict) -> dict:
+    """DTO para listar un pedido Dropi en el panel (feature 017).
+
+    `in_store` indica si el pedido tiene contraparte en WooCommerce (shop_order_id).
+    """
+    dc = o.get("distribution_company") or {}
+    sid = o.get("shop_order_id")
+    name = " ".join(p for p in (o.get("name"), o.get("surname")) if p).strip()
+    return {
+        "dropi_order_id": o.get("id"),
+        "status": (o.get("status") or "").strip() or None,
+        "carrier": dc.get("name") or o.get("shipping_company"),
+        "guide": o.get("shipping_guide") or None,
+        "guide_url": o.get("guia_urls3") or None,
+        "total": o.get("total_order"),
+        "created_at": o.get("created_at"),
+        "city": o.get("city"),
+        "state": o.get("state"),
+        "customer": name or None,
+        "phone": o.get("phone"),
+        "wc_order_id": sid,
+        "in_store": bool(sid),
+    }
+
+
 def image_urls(product: dict) -> list[str]:
     """URLs absolutas de las fotos del producto (gallery/photos con urlS3)."""
     from urllib.parse import quote

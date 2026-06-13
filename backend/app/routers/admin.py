@@ -205,6 +205,27 @@ async def orders_sync_trigger(_: str = Depends(require_admin_session)) -> dict:
     return {"status": "running", "kind": "order_sync"}
 
 
+@router.get("/dropi/orders")
+async def list_dropi_orders(_: str = Depends(require_admin_session)) -> dict:
+    """Lista los pedidos directamente desde Dropi (feature 017).
+
+    Incluye los nativos de Dropi (sin contraparte en WooCommerce). `in_store`
+    indica cuáles existen también en la tienda.
+    """
+    from app.clients import dropi
+    from app.config import settings
+
+    if not settings.DROPI_WC_INTEGRATION_KEY:
+        raise HTTPException(status_code=503, detail="dropi_sync_disabled") from None
+    try:
+        orders = await dropi.list_orders()
+    except Exception:  # noqa: BLE001 — fallo de Dropi (red/WAF/HTTP)
+        raise HTTPException(status_code=502, detail="dropi_unavailable") from None
+    items = [dropi.order_display_dto(o) for o in orders]
+    in_store = sum(1 for i in items if i["in_store"])
+    return {"items": items, "total": len(items), "in_store": in_store}
+
+
 @router.get("/orders/{order_id}")
 async def order_detail(order_id: int, _: str = Depends(require_admin_session)) -> dict:
     try:

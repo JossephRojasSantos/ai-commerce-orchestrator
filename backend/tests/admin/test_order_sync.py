@@ -267,6 +267,57 @@ async def test_orders_sync_endpoint_409_when_locked(admin_client):
     assert resp.json()["message"] == "already_running"
 
 
+def test_order_display_dto_marks_in_store():
+    linked = dropi.order_display_dto(
+        {
+            "id": 1,
+            "shop_order_id": 97,
+            "status": "ENTREGADO",
+            "name": "Ana",
+            "surname": "Pérez",
+            "city": "CALI",
+            "state": "VALLE",
+            "total_order": 130000,
+            "distribution_company": {"name": "COORDINADORA"},
+        }
+    )
+    assert linked["in_store"] is True and linked["wc_order_id"] == 97
+    assert linked["customer"] == "Ana Pérez" and linked["carrier"] == "COORDINADORA"
+
+    native = dropi.order_display_dto({"id": 2, "shop_order_id": None, "status": "PENDIENTE"})
+    assert native["in_store"] is False and native["wc_order_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_dropi_orders_endpoint_lists_and_counts(admin_client):
+    orders = [_dropi_order(1, 97, "ENTREGADO"), _dropi_order(2, None, "PENDIENTE")]
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch("app.clients.dropi.list_orders", AsyncMock(return_value=orders)),
+    ):
+        resp = await admin_client.get("/v1/admin/dropi/orders")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 2 and body["in_store"] == 1
+
+
+@pytest.mark.asyncio
+async def test_dropi_orders_endpoint_503_when_disabled(admin_client):
+    with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", ""):
+        resp = await admin_client.get("/v1/admin/dropi/orders")
+    assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_dropi_orders_endpoint_502_on_dropi_error(admin_client):
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch("app.clients.dropi.list_orders", AsyncMock(side_effect=RuntimeError("boom"))),
+    ):
+        resp = await admin_client.get("/v1/admin/dropi/orders")
+    assert resp.status_code == 502
+
+
 @pytest.mark.asyncio
 async def test_orders_sync_endpoint_202_launches(admin_client):
     launched = {}

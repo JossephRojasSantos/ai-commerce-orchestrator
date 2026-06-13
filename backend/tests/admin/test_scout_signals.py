@@ -206,3 +206,20 @@ async def test_compute_signals_novelty(scout_db, monkeypatch):
         await scout_db.execute(text("SELECT is_novelty FROM scout_signal WHERE dropi_product_id=3"))
     ).one()
     assert bool(row[0]) is True  # FR-006
+
+
+@pytest.mark.asyncio
+async def test_compute_signals_batches_large_insert(scout_db, monkeypatch):
+    """>2000 productos: el insert de señales se trocea (límite 32767 params asyncpg)."""
+    from app.services.admin import scout as scout_mod
+
+    today = date(2026, 6, 13)
+    monkeypatch.setattr(scout_mod, "business_today", lambda: today)
+    for pid in range(1, 2101):  # 2100 > chunk de 2000
+        await upsert_snapshot(scout_db, _product(pid=pid), today)
+    await scout_db.commit()
+
+    n = await compute_signals(scout_db)
+    assert n == 2100
+    total = (await scout_db.execute(text("SELECT count(*) FROM scout_signal"))).scalar()
+    assert total == 2100

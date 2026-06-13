@@ -231,3 +231,14 @@ def test_margin_pct_clamped_to_column_range():
     assert m == -9999.99  # cabe en NUMERIC(6,2), no desborda
     # margen viable normal sin tocar
     assert margin_pct(99900, 50000, 12000) == pytest.approx(37.94, abs=0.01)
+
+
+def test_dropi_product_url_includes_slug():
+    from app.services.admin.scout import dropi_product_url
+
+    u = dropi_product_url(497428, "MOTO 49CC")
+    assert u == "https://app.dropi.co/dashboard/product-details/497428/moto-49cc"
+    # tildes y signos
+    u2 = dropi_product_url(5, "Pulidor de Uñas Eléctrico (2 en 1)")
+    assert u2.endswith("/5/pulidor-de-unas-electrico-2-en-1")
+    assert dropi_product_url(9, "").endswith("/9/producto")  # nombre vacío

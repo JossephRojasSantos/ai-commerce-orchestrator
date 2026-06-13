@@ -222,6 +222,7 @@ async def get_ranking(
     category: str | None = None,
     period: str = "7d",
     include_nonviable: bool = False,
+    search: str | None = None,
     limit: int = 100,
 ) -> dict:
     """Ranking de candidatos: señales + último snapshot + score IA (FR-007/013).
@@ -250,6 +251,15 @@ async def get_ranking(
         q = q.where(ScoutSignal.is_viable.is_(True))
     if category:
         q = q.where(ScoutSnapshot.category == category)
+    if search and search.strip():
+        # Búsqueda por términos: cada palabra debe aparecer en nombre o categoría
+        # (AND entre términos, OR entre campos). Tolerante a may/min.
+        for term in search.lower().split():
+            like = f"%{term}%"
+            q = q.where(
+                func.lower(ScoutSnapshot.name).like(like)
+                | func.lower(func.coalesce(ScoutSnapshot.category, "")).like(like)
+            )
 
     rows = (await db.execute(q)).all()
 

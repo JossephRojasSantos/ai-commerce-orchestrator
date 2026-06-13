@@ -66,6 +66,39 @@ async def list_categories() -> list[dict]:
     return data.get("objects") or []
 
 
+async def get_product_detail(product_id: int) -> dict:
+    """Detalle completo de un producto (products/v2): descripción, fotos, user_id."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(
+            f"{settings.DROPI_API_BASE}/products/v2/{product_id}", headers=_headers()
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    if not data.get("isSuccess"):
+        raise RuntimeError(f"dropi products/v2/{product_id} failed")
+    obj = data.get("objects")
+    if isinstance(obj, list):
+        obj = obj[0] if obj else None
+    if not obj:
+        raise RuntimeError(f"dropi product {product_id} sin datos")
+    return obj
+
+
+def image_urls(product: dict) -> list[str]:
+    """URLs absolutas de las fotos del producto (gallery/photos con urlS3)."""
+    from urllib.parse import quote
+
+    base = settings.DROPI_API_BASE.split("/integrations")[0] + "/"
+    urls = []
+    for ph in product.get("photos") or product.get("gallery") or []:
+        u = ph.get("url")
+        if not u and ph.get("urlS3"):
+            u = base + quote(ph["urlS3"], safe="/:")
+        if u:
+            urls.append(u)
+    return urls
+
+
 def stock_total(product: dict) -> int:
     """Suma el stock de todas las bodegas del producto."""
     return sum(int(w.get("stock") or 0) for w in product.get("warehouse_product") or [])

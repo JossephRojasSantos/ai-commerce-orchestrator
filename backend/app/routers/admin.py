@@ -487,6 +487,7 @@ async def scout_ranking(
     category: str | None = None,
     period: Literal["today", "7d", "30d"] = "7d",
     include_nonviable: bool = False,
+    search: str | None = None,
     _: str = Depends(require_admin_session),
 ) -> dict:
     from app.db.base import AsyncSessionLocal
@@ -494,7 +495,11 @@ async def scout_ranking(
 
     async with AsyncSessionLocal() as db:
         return await scout_svc.get_ranking(
-            db, category=category, period=period, include_nonviable=include_nonviable
+            db,
+            category=category,
+            period=period,
+            include_nonviable=include_nonviable,
+            search=search,
         )
 
 
@@ -532,6 +537,21 @@ async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
         raise HTTPException(status_code=409, detail="already_running") from None
     asyncio.get_running_loop().create_task(run_scoring_locked())
     return {"status": "running", "kind": "score"}
+
+
+@router.post("/scout/import/{dropi_product_id}", status_code=201)
+async def scout_import(
+    dropi_product_id: int, _: str = Depends(require_admin_session)
+) -> dict:
+    from app.services.admin.scout_import import import_product
+
+    try:
+        result = await import_product(dropi_product_id)
+    except (WCClientError, WCServerError) as exc:
+        raise HTTPException(status_code=502, detail=f"woocommerce_error: {exc.message}") from None
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return result
 
 
 @router.get("/scout/demand")

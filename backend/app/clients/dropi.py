@@ -92,7 +92,8 @@ async def list_orders(result_number: int | None = None) -> list[dict]:
     órdenes traen `shop_order_id` = ID de la orden en WooCommerce (None si la orden
     fue creada directo en Dropi y no tiene contraparte en la tienda).
     """
-    n = result_number or settings.DROPI_ORDERS_FETCH
+    # Dropi rechaza result_number alto con HTTP 400 (validado: 100 ok, 200 falla).
+    n = min(result_number or settings.DROPI_ORDERS_FETCH, 100)
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.get(
             f"{settings.DROPI_API_BASE}/orders/myorders",

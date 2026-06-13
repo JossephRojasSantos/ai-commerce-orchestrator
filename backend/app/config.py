@@ -99,7 +99,9 @@ class Settings(BaseSettings):
     # Sync de pedidos Dropi → WooCommerce (feature 016).
     # Token de la integración WOOCOMERCE de Dropi (distinto al de Scout). Vacío = sync deshabilitado.
     DROPI_WC_INTEGRATION_KEY: str = ""
-    DROPI_ORDERS_FETCH: int = 200  # result_number en /orders/myorders por corrida de sync
+    # result_number en /orders/myorders por corrida de sync.
+    # Dropi rechaza valores altos con HTTP 400 (validado en vivo: 100 ok, 200 falla).
+    DROPI_ORDERS_FETCH: int = 100
     # Si True, además de escribir metadatos transiciona el estado de la orden WC
     # (puede disparar emails/automatizaciones de WooCommerce). False = solo metadatos.
     DROPI_SYNC_WC_STATUS: bool = True

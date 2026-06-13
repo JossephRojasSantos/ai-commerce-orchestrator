@@ -748,7 +748,8 @@
               msg.textContent = '✓ Ya estaba en la tienda';
               msg.className = 'scout-add-msg ok';
             } else {
-              msg.innerHTML = '✅ Agregado como borrador' + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
+              const noImg = r.images_imported === false ? ' (sin fotos — agrégalas en el producto)' : '';
+              msg.innerHTML = '✅ Agregado como borrador' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
               msg.className = 'scout-add-msg ok';
             }
             btn.textContent = '✓ Agregado';

@@ -88,11 +88,27 @@ async def import_product(dropi_product_id: int) -> dict:
         # WC necesita ids de categoría propios; si no mapean, se omite (queda sin categoría)
         pass
 
-    created = await wc.create_product(payload)
-    logger.info("scout.imported", dropi_id=dropi_product_id, wc_id=created.get("id"))
+    from app.clients.woocommerce import WCClientError
+
+    images_ok = True
+    try:
+        created = await wc.create_product(payload)
+    except WCClientError as exc:
+        # El CDN/WAF de Dropi bloquea la descarga server-side de fotos desde Hostinger;
+        # si WC no puede traer la imagen, se importa sin ella (el usuario la sube luego).
+        if "image" not in (exc.message or "").lower():
+            raise
+        images_ok = False
+        payload["images"] = []
+        created = await wc.create_product(payload)
+
+    logger.info(
+        "scout.imported", dropi_id=dropi_product_id, wc_id=created.get("id"), images=images_ok
+    )
     return {
         "status": "created",
         "wc_id": created.get("id"),
         "name": created.get("name"),
         "permalink": created.get("permalink"),
+        "images_imported": images_ok,
     }

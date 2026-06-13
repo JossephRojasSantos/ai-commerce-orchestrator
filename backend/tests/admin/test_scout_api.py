@@ -148,3 +148,31 @@ async def test_ingest_endpoint_202_launches_background(admin_client):
     assert resp.status_code == 202
     assert resp.json()["status"] == "running"
     assert launched.get("yes") is True
+
+
+@pytest.mark.asyncio
+async def test_ranking_search_multi_term(scout_db, monkeypatch):
+    from datetime import date
+
+    from app.services.admin import scout as scout_mod
+
+    today = date(2026, 6, 13)
+    monkeypatch.setattr(scout_mod, "business_today", lambda: today)
+    await upsert_snapshot(
+        scout_db, _product(pid=1, name="Lampara Solar Jardin", cost=20000, suggested=99900), today
+    )
+    await upsert_snapshot(
+        scout_db, _product(pid=2, name="Audifonos Gamer BT", cost=30000, suggested=99900), today
+    )
+    await scout_db.commit()
+    await scout_mod.compute_signals(scout_db)
+
+    # ambos términos deben aparecer (AND) → solo la lámpara
+    out = await get_ranking(scout_db, search="lampara solar")
+    assert [c["dropi_product_id"] for c in out["candidates"]] == [1]
+    # término en categoría/nombre, may/min indiferente
+    out2 = await get_ranking(scout_db, search="GAMER")
+    assert [c["dropi_product_id"] for c in out2["candidates"]] == [2]
+    # sin coincidencia
+    out3 = await get_ranking(scout_db, search="bicicleta")
+    assert out3["candidates"] == []

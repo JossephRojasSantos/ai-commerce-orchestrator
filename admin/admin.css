@@ -273,3 +273,7 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 /* ── Scout (feature 014) ── */
 .scout-reason { color: var(--color-text-muted); display: inline-block; max-width: 260px; }
 .scout-link { white-space: nowrap; font-size: 13px; padding: 6px 10px; }
+.scout-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.scout-add-msg { font-size: 12px; }
+.scout-add-msg.ok { color: var(--color-success, #16a34a); }
+.scout-add-msg.err { color: var(--color-danger, #dc2626); }

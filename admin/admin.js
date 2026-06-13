@@ -530,7 +530,7 @@
               <td>${
                 p.origin === 'dropi'
                   ? p.margin_alert
-                    ? `<span class="badge alert">⚠️ ${fmtCOP(p.margin)}</span>`
+                    ? `<span class="badge alert" title="Precio mínimo recomendado: ${p.price_floor != null ? fmtCOP(p.price_floor) : '—'}">⚠️ ${fmtCOP(p.margin)}</span>${p.price_floor != null ? `<br><small>mín ${fmtCOP(p.price_floor)}</small>` : ''}`
                     : `<span class="badge ok">${fmtCOP(p.margin)}</span>`
                   : '—'
               }</td>

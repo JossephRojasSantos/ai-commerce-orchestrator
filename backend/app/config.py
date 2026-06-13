@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD_SALT: str = ""
     ADMIN_SESSION_TTL: int = 28800  # 8h, deslizante
     ADMIN_SHIPPING_COST_ESTIMATE: int = 12000  # flete estimado COP para margen Dropi
+    # Margen mínimo COP por unidad. Piso de precio Dropi = costo + flete + este margen.
+    # Vender por debajo → Dropi rechaza el pedido COD ("monto a ganar ≤ 0"). 0 = solo break-even.
+    ADMIN_MIN_MARGIN: int = 0
 
     # MFA del panel (TOTP + respaldo WhatsApp)
     ADMIN_TOTP_SECRET: str = ""  # base32; si vacío, MFA deshabilitado (no enrolado)

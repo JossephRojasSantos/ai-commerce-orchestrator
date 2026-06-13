@@ -34,6 +34,6 @@ async def run_sync_locked() -> dict | None:
         await r.aclose()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     result = asyncio.run(run_sync_locked())
     print(result if result is not None else {"status": "already_running"})

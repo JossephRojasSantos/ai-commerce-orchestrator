@@ -6,8 +6,10 @@ import httpx
 import pytest
 import respx
 from app.clients import dropi
+from app.clients.woocommerce import WCClientError, WCServerError
 from app.config import settings
 from app.services.admin import order_sync
+from app.workers import dropi_order_sync
 
 
 def _dropi_order(dropi_id, wc_id, status, carrier="COORDINADORA", guide=None, guide_url=None):
@@ -158,3 +160,117 @@ async def test_sync_orders_disabled_when_no_token():
     with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", ""):
         result = await order_sync.sync_orders()
     assert result["status"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_sync_orders_counts_wc_errors():
+    orders = [
+        _dropi_order(1, 97, "ENTREGADO"),  # 404 → skipped
+        _dropi_order(2, 98, "ENTREGADO"),  # 500 client → failed
+        _dropi_order(3, 99, "ENTREGADO"),  # server error → failed
+    ]
+    fake_wc = AsyncMock()
+    fake_wc.get_order_raw.side_effect = [
+        WCClientError(404, "not found"),
+        WCClientError(500, "boom"),
+        WCServerError(503, "down"),
+    ]
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch.object(order_sync.dropi, "list_orders", AsyncMock(return_value=orders)),
+        patch.object(order_sync, "get_wc_client", AsyncMock(return_value=fake_wc)),
+    ):
+        result = await order_sync.sync_orders()
+    assert result["skipped"] == 1
+    assert result["failed"] == 2
+    fake_wc.update_order.assert_not_awaited()
+
+
+# ── heurística de mapeo (variantes no catalogadas) ──
+@pytest.mark.parametrize(
+    "dropi_status,expected",
+    [
+        ("ENTREGA PARCIAL", "completed"),
+        ("DEVOLUCION PARCIAL", "refunded"),
+        ("PEDIDO ANULADO", "cancelled"),
+        ("EN PROCESO LOGISTICO", "processing"),
+        ("PENDIENTE DE ALGO", "on-hold"),
+    ],
+)
+def test_map_status_heuristics(dropi_status, expected):
+    assert order_sync.map_status(dropi_status) == expected
+
+
+# ── worker (lock Redis) ──
+class _FakeRedis:
+    def __init__(self, acquired):
+        self._acquired = acquired
+        self.deleted = False
+
+    async def set(self, *a, **kw):
+        return self._acquired
+
+    async def delete(self, *a):
+        self.deleted = True
+
+    async def aclose(self):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_run_sync_locked_blocks_when_locked():
+    with patch("redis.asyncio.from_url", return_value=_FakeRedis(acquired=None)):
+        assert await dropi_order_sync.run_sync_locked() is None
+
+
+@pytest.mark.asyncio
+async def test_run_sync_locked_runs_and_releases():
+    r = _FakeRedis(acquired=True)
+    with (
+        patch("redis.asyncio.from_url", return_value=r),
+        patch.object(dropi_order_sync, "sync_orders", AsyncMock(return_value={"status": "ok"})),
+    ):
+        result = await dropi_order_sync.run_sync_locked()
+    assert result == {"status": "ok"}
+    assert r.deleted is True  # lock liberado
+
+
+# ── endpoint POST /v1/admin/orders/sync ──
+@pytest.mark.asyncio
+async def test_orders_sync_endpoint_503_when_disabled(admin_client):
+    with patch.object(settings, "DROPI_WC_INTEGRATION_KEY", ""):
+        resp = await admin_client.post("/v1/admin/orders/sync")
+    assert resp.status_code == 503
+    assert resp.json()["message"] == "dropi_sync_disabled"
+
+
+@pytest.mark.asyncio
+async def test_orders_sync_endpoint_409_when_locked(admin_client):
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch("app.routers.admin._scout_lock_active", new=AsyncMock(return_value=True)),
+    ):
+        resp = await admin_client.post("/v1/admin/orders/sync")
+    assert resp.status_code == 409
+    assert resp.json()["message"] == "already_running"
+
+
+@pytest.mark.asyncio
+async def test_orders_sync_endpoint_202_launches(admin_client):
+    launched = {}
+
+    async def fake_run():
+        launched["yes"] = True
+
+    with (
+        patch.object(settings, "DROPI_WC_INTEGRATION_KEY", "wc-tok"),
+        patch("app.routers.admin._scout_lock_active", new=AsyncMock(return_value=False)),
+        patch("app.workers.dropi_order_sync.run_sync_locked", side_effect=fake_run),
+    ):
+        resp = await admin_client.post("/v1/admin/orders/sync")
+        import asyncio
+
+        await asyncio.sleep(0)
+    assert resp.status_code == 202
+    assert resp.json()["status"] == "running"
+    assert launched.get("yes") is True

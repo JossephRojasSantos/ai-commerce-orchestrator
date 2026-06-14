@@ -615,12 +615,20 @@
     steps: [['title', 'Título del paso', 'text'], ['text', 'Detalle', 'text']],
     compare: [['feature', 'Característica', 'text'], ['us', 'Nosotros', 'check'], ['common', 'Común', 'check'], ['others', 'Otras', 'check']],
     faq: [['q', 'Pregunta', 'text'], ['a', 'Respuesta', 'text']],
-    reviews: [['name', 'Nombre', 'text'], ['city', 'Ciudad', 'text'], ['stars', '★ 1-5', 'text'], ['text', 'Reseña', 'text']],
+    reviews: [['name', 'Nombre', 'text'], ['city', 'Ciudad', 'text'], ['stars', '★ 1-5', 'text'], ['text', 'Reseña', 'text'], ['image', 'Foto', 'img']],
   };
 
   function peXCell(field) {
     const [k, ph, type] = field;
     if (type === 'check') return `<label class="le-chk" title="${esc(ph)}"><input type="checkbox" data-k="${k}"> ${esc(ph)}</label>`;
+    if (type === 'img') {
+      return `<span class="le-img" title="${esc(ph)}">
+        <input type="hidden" data-k="${k}">
+        <img class="le-img-pv" alt="" hidden>
+        <label class="le-up btn-ghost">📷<input type="file" class="le-file" accept="image/*" hidden></label>
+        <span class="le-img-msg"></span>
+      </span>`;
+    }
     return `<input type="text" data-k="${k}" placeholder="${esc(ph)}">`;
   }
   function peXRow(section) {
@@ -635,8 +643,16 @@
     PE_XFIELDS[section].forEach(([k, , type]) => {
       const el = rowEl.querySelector(`[data-k="${k}"]`);
       if (!el) return;
-      if (type === 'check') el.checked = !!item[k];
-      else el.value = item[k] ?? '';
+      if (type === 'check') {
+        el.checked = !!item[k];
+      } else {
+        el.value = item[k] ?? '';
+        if (type === 'img' && item[k]) {
+          const pv = rowEl.querySelector('.le-img-pv');
+          pv.src = item[k];
+          pv.hidden = false;
+        }
+      }
     });
   }
 
@@ -766,6 +782,30 @@
       }
       const rm = e.target.closest('.le-rm');
       if (rm) rm.closest('.le-row').remove();
+    });
+    // subida de foto de reseña → POST /media → guarda URL + preview
+    card.addEventListener('change', async (e) => {
+      const file = e.target.closest('.le-file');
+      if (!file || !file.files[0]) return;
+      const box = file.closest('.le-img');
+      const msg = box.querySelector('.le-img-msg');
+      msg.textContent = '⏳';
+      try {
+        const fd = new FormData();
+        fd.append('file', file.files[0]);
+        const resp = await fetch(API + '/media', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + getToken() }, body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.detail || 'error');
+        box.querySelector('[data-k="image"]').value = data.url;
+        const pv = box.querySelector('.le-img-pv');
+        pv.src = data.url;
+        pv.hidden = false;
+        msg.textContent = '✅';
+      } catch (err) {
+        msg.textContent = err.message === 'imagen_muy_grande' ? '⚠️ muy grande' : '⚠️ error';
+      }
     });
   }
 

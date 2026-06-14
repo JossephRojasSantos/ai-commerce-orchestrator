@@ -77,6 +77,42 @@ async def test_update_landing_writes_meta(admin_client, no_cache):
 
 
 @pytest.mark.asyncio
+async def test_detail_and_update_tm_meta_content(admin_client, no_cache):
+    # detalle: lee _tm_* en tm_meta
+    p = make_product(101, price="49900")
+    p.setdefault("meta_data", []).extend(
+        [
+            {"key": "_tm_benefits", "value": ["USB", "Portátil"]},
+            {"key": "_tm_includes", "value": "1x licuadora"},
+        ]
+    )
+    captured = {}
+
+    async def fake_update(pid, payload):
+        captured.update(payload)
+        return p
+
+    wc = MagicMock()
+    wc.get_product_raw = AsyncMock(return_value=p)
+    wc.update_product = AsyncMock(side_effect=fake_update)
+    with patch(
+        "app.services.admin.products_admin.get_wc_client", new_callable=AsyncMock, return_value=wc
+    ):
+        d = (await admin_client.get("/v1/admin/products/101", headers=ADMIN_AUTH)).json()
+        assert d["tm_meta"]["benefits"] == ["USB", "Portátil"]
+        assert d["tm_meta"]["includes"] == "1x licuadora"
+        # update: escribe _tm_* meta
+        await admin_client.put(
+            "/v1/admin/products/101",
+            headers=ADMIN_AUTH,
+            json={"tm_meta": {"benefits": ["A", " ", "B"], "warranty": "30 días"}},
+        )
+    meta = {m["key"]: m["value"] for m in captured["meta_data"]}
+    assert meta["_tm_benefits"] == ["A", "B"]  # vacíos filtrados
+    assert meta["_tm_warranty"] == "30 días"
+
+
+@pytest.mark.asyncio
 async def test_update_visible_toggles_status(admin_client, no_cache):
     captured = {}
 

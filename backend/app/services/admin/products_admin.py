@@ -22,6 +22,32 @@ _CACHE_KEY = "admin:products"
 _CACHE_TTL = 60
 
 
+# Contenido editable de las secciones del producto (feature 019).
+# clave del DTO → meta WordPress (_tm_*). El template los lee con tm_get_parity_meta().
+_TM_META = {
+    "benefits": "_tm_benefits",  # lista de strings
+    "includes": "_tm_includes",
+    "warranty": "_tm_warranty",
+    "use_case": "_tm_use_case",
+    "size": "_tm_size",
+    "badge": "_tm_badge",
+    "rating": "_tm_rating",
+    "reviews": "_tm_reviews",
+}
+
+
+def _extract_tm_meta(meta_data: list) -> dict:
+    raw = {m.get("key"): m.get("value") for m in meta_data or []}
+    out = {}
+    for k, meta_key in _TM_META.items():
+        v = raw.get(meta_key)
+        if k == "benefits":
+            out[k] = v if isinstance(v, list) else []
+        else:
+            out[k] = v if v not in (None, False) else ""
+    return out
+
+
 def _extract_landing(meta_data: list) -> dict:
     for meta in meta_data or []:
         if meta.get("key") == _LANDING_META:
@@ -107,6 +133,7 @@ def _to_detail(p: dict) -> dict:
     dto["permalink"] = p.get("permalink", "")
     dto["visible"] = p.get("status") == "publish"
     dto["landing"] = _extract_landing(p.get("meta_data", []))
+    dto["tm_meta"] = _extract_tm_meta(p.get("meta_data", []))
     return dto
 
 
@@ -125,12 +152,24 @@ async def update_product(
     short_description: str | None = None,
     visible: bool | None = None,
     landing: dict | None = None,
+    tm_meta: dict | None = None,
 ) -> dict:
     payload: dict = {}
+    meta: list = []
     if landing is not None:
-        payload["meta_data"] = [
-            {"key": _LANDING_META, "value": json.dumps(landing, ensure_ascii=False)}
-        ]
+        meta.append({"key": _LANDING_META, "value": json.dumps(landing, ensure_ascii=False)})
+    if tm_meta is not None:
+        for k, meta_key in _TM_META.items():
+            if k not in tm_meta:
+                continue
+            v = tm_meta[k]
+            if k == "benefits":
+                v = [str(x).strip() for x in (v or []) if str(x).strip()]
+            elif k in ("rating", "reviews"):
+                v = v if v not in (None, "") else 0
+            meta.append({"key": meta_key, "value": v})
+    if meta:
+        payload["meta_data"] = meta
     if price is not None:
         payload["regular_price"] = str(int(price))
     if stock is not None:

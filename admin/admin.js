@@ -604,6 +604,41 @@
     return { sections };
   }
 
+  // Secciones extra estilo landing (opt-in, default OFF). Render: tm-landing.php.
+  const PE_XSECTIONS = [
+    ['scarcity', '🔥 Escasez (quedan X)'],
+    ['steps', '👣 Cómo funciona'],
+    ['compare', '📊 Comparativa'],
+    ['faq', '❓ FAQ'],
+  ];
+  const PE_XFIELDS = {
+    steps: [['title', 'Título del paso', 'text'], ['text', 'Detalle', 'text']],
+    compare: [['feature', 'Característica', 'text'], ['us', 'Nosotros', 'check'], ['common', 'Común', 'check'], ['others', 'Otras', 'check']],
+    faq: [['q', 'Pregunta', 'text'], ['a', 'Respuesta', 'text']],
+  };
+
+  function peXCell(field) {
+    const [k, ph, type] = field;
+    if (type === 'check') return `<label class="le-chk" title="${esc(ph)}"><input type="checkbox" data-k="${k}"> ${esc(ph)}</label>`;
+    return `<input type="text" data-k="${k}" placeholder="${esc(ph)}">`;
+  }
+  function peXRow(section) {
+    return `<div class="le-row">${PE_XFIELDS[section].map(peXCell).join('')}<button type="button" class="pe-del le-rm" title="Quitar">✕</button></div>`;
+  }
+  function peXList(section, label) {
+    return `<div class="le-block" data-le="${section}">
+      <div class="le-head"><strong>${esc(label)}</strong><button type="button" class="btn-ghost le-add" data-add="${section}">➕ Añadir</button></div>
+      <div class="le-rows"></div></div>`;
+  }
+  function peXFillRow(rowEl, section, item) {
+    PE_XFIELDS[section].forEach(([k, , type]) => {
+      const el = rowEl.querySelector(`[data-k="${k}"]`);
+      if (!el) return;
+      if (type === 'check') el.checked = !!item[k];
+      else el.value = item[k] ?? '';
+    });
+  }
+
   function peLandingCardHtml() {
     const toggles = PE_SECTIONS.map(
       ([k, label]) => `<label class="switch-inline le-sec"><input type="checkbox" data-sec="${k}"> ${esc(label)}</label>`
@@ -628,6 +663,16 @@
         <div><label for="tm-rating">⭐ Rating</label><input type="number" id="tm-rating" min="0" max="5" step="0.1" style="width:90px"></div>
         <div><label for="tm-reviews"># Reseñas</label><input type="number" id="tm-reviews" min="0" step="1" style="width:110px"></div>
       </div>
+      <hr>
+      <p><strong>✨ Secciones extra (estilo landing)</strong> <small>· opcionales, apagadas por defecto</small></p>
+      <div class="le-toggles">${PE_XSECTIONS.map(([k, label]) => `<label class="switch-inline le-sec"><input type="checkbox" data-sec="${k}"> ${esc(label)}</label>`).join('')}</div>
+      <div class="le-inline">
+        <div><label for="le-price-old">💲 Precio tachado (ancla)</label><input type="number" id="le-price-old" min="0" step="100" placeholder="116000" style="width:160px"></div>
+        <div><label for="le-scarcity-units">🔥 Unidades (escasez)</label><input type="number" id="le-scarcity-units" min="1" step="1" placeholder="8" style="width:120px"></div>
+      </div>
+      ${peXList('steps', 'Cómo funciona (título · detalle)')}
+      ${peXList('compare', 'Comparativa (característica · nosotros/común/otras)')}
+      ${peXList('faq', 'FAQ (pregunta · respuesta)')}
       <div class="le-save-row">
         <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar secciones y contenido</button>
         <span id="pe-landing-msg" aria-live="polite"></span>
@@ -640,6 +685,19 @@
     PE_SECTIONS.forEach(([k]) => {
       const t = document.querySelector(`[data-sec="${k}"]`);
       if (t) t.checked = sec[k] !== false;
+    });
+    PE_XSECTIONS.forEach(([k]) => {
+      const t = document.querySelector(`[data-sec="${k}"]`);
+      if (t) t.checked = sec[k] === true; // extra: default off
+    });
+    $('le-price-old').value = L && L.price_old ? L.price_old : '';
+    $('le-scarcity-units').value = L && L.scarcity_units ? L.scarcity_units : '';
+    Object.keys(PE_XFIELDS).forEach((section) => {
+      const wrap = document.querySelector(`[data-le="${section}"] .le-rows`);
+      ((L && L[section]) || []).forEach((item) => {
+        wrap.insertAdjacentHTML('beforeend', peXRow(section));
+        peXFillRow(wrap.lastElementChild, section, item);
+      });
     });
     tm = tm || {};
     $('tm-benefits').value = (tm.benefits || []).join('\n');
@@ -671,10 +729,43 @@
       const t = document.querySelector(`[data-sec="${k}"]`);
       sections[k] = t ? t.checked : true;
     });
-    return { sections };
+    PE_XSECTIONS.forEach(([k]) => {
+      const t = document.querySelector(`[data-sec="${k}"]`);
+      sections[k] = t ? t.checked : false;
+    });
+    const L = {
+      sections,
+      price_old: $('le-price-old').value ? parseInt($('le-price-old').value, 10) : null,
+      scarcity_units: parseInt($('le-scarcity-units').value, 10) || 0,
+    };
+    Object.keys(PE_XFIELDS).forEach((section) => {
+      L[section] = [...document.querySelectorAll(`[data-le="${section}"] .le-row`)]
+        .map((row) => {
+          const o = {};
+          PE_XFIELDS[section].forEach(([k, , type]) => {
+            const el = row.querySelector(`[data-k="${k}"]`);
+            o[k] = type === 'check' ? el.checked : el.value.trim();
+          });
+          return o;
+        })
+        .filter((o) => Object.entries(o).some(([, v]) => v !== '' && v !== false));
+    });
+    return L;
   }
 
-  function peBindLanding() {} // opción A: solo toggles, sin filas que enlazar
+  function peBindLanding() {
+    const card = $('pe-landing');
+    if (!card) return;
+    card.addEventListener('click', (e) => {
+      const add = e.target.closest('.le-add');
+      if (add) {
+        document.querySelector(`[data-le="${add.dataset.add}"] .le-rows`).insertAdjacentHTML('beforeend', peXRow(add.dataset.add));
+        return;
+      }
+      const rm = e.target.closest('.le-rm');
+      if (rm) rm.closest('.le-row').remove();
+    });
+  }
 
   async function viewProductEdit(id) {
     content().innerHTML = '<div id="pe-body">Cargando…</div>';

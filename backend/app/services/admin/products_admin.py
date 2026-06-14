@@ -5,6 +5,7 @@ plugin Dropify); se extrae `sale_price` con regex (research R2). El meta crudo
 JAMÁS sale de este módulo — contiene el token JWT de la integración Dropi.
 """
 
+import json
 import re
 
 import structlog
@@ -16,8 +17,20 @@ from app.core.cache import cache_delete, cache_get, cache_set
 logger = structlog.get_logger()
 
 _SALE_PRICE_RE = re.compile(r's:10:"sale_price";s:\d+:"([\d.]+)"')
+_LANDING_META = "_tm_landing"  # config de la landing por cajas (feature 019)
 _CACHE_KEY = "admin:products"
 _CACHE_TTL = 60
+
+
+def _extract_landing(meta_data: list) -> dict:
+    for meta in meta_data or []:
+        if meta.get("key") == _LANDING_META:
+            try:
+                v = meta.get("value")
+                return json.loads(v) if isinstance(v, str) else (v or {})
+            except (ValueError, TypeError):
+                return {}
+    return {}
 
 
 def _extract_supplier_cost(meta_data: list) -> float | None:
@@ -93,6 +106,7 @@ def _to_detail(p: dict) -> dict:
     ]
     dto["permalink"] = p.get("permalink", "")
     dto["visible"] = p.get("status") == "publish"
+    dto["landing"] = _extract_landing(p.get("meta_data", []))
     return dto
 
 
@@ -110,8 +124,13 @@ async def update_product(
     description: str | None = None,
     short_description: str | None = None,
     visible: bool | None = None,
+    landing: dict | None = None,
 ) -> dict:
     payload: dict = {}
+    if landing is not None:
+        payload["meta_data"] = [
+            {"key": _LANDING_META, "value": json.dumps(landing, ensure_ascii=False)}
+        ]
     if price is not None:
         payload["regular_price"] = str(int(price))
     if stock is not None:

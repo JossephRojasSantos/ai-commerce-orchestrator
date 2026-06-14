@@ -615,6 +615,7 @@
     steps: [['title', 'Título del paso', 'text'], ['text', 'Detalle', 'text']],
     compare: [['feature', 'Característica', 'text'], ['us', 'Nosotros', 'check'], ['common', 'Común', 'check'], ['others', 'Otras', 'check']],
     faq: [['q', 'Pregunta', 'text'], ['a', 'Respuesta', 'text']],
+    reviews: [['name', 'Nombre', 'text'], ['city', 'Ciudad', 'text'], ['stars', '★ 1-5', 'text'], ['text', 'Reseña', 'text']],
   };
 
   function peXCell(field) {
@@ -673,6 +674,7 @@
       ${peXList('steps', 'Cómo funciona (título · detalle)')}
       ${peXList('compare', 'Comparativa (característica · nosotros/común/otras)')}
       ${peXList('faq', 'FAQ (pregunta · respuesta)')}
+      ${peXList('reviews', 'Reseñas (nombre · ciudad · ★ · texto) — reemplazan las automáticas')}
       <div class="le-save-row">
         <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar secciones y contenido</button>
         <span id="pe-landing-msg" aria-live="polite"></span>

@@ -612,19 +612,57 @@
       <h2>🧩 Secciones de la página del producto</h2>
       <p><small>Activa o desactiva qué secciones ve el cliente en la tienda. Lo apagado no se muestra.</small></p>
       <div class="le-toggles">${toggles}</div>
+      <hr>
+      <p><strong>Contenido de las secciones</strong> <small>· las imágenes se gestionan arriba en "Creativos (fotos)"</small></p>
+      <label for="tm-benefits">✅ Beneficios <small>(uno por línea)</small></label>
+      <textarea id="tm-benefits" rows="4" placeholder="Recargable USB&#10;Cabe en tu bolso&#10;Tritura hielo"></textarea>
+      <div class="le-inline">
+        <div style="flex:1"><label for="tm-includes">📦 Incluye</label><input type="text" id="tm-includes" placeholder="1x licuadora, cable USB, vaso"></div>
+        <div style="flex:1"><label for="tm-warranty">🛡️ Garantía</label><input type="text" id="tm-warranty" placeholder="30 días de garantía"></div>
+      </div>
+      <label for="tm-usecase">🪄 ¿Esto me sirve? <small>(caso de uso para el asistente IA)</small></label>
+      <input type="text" id="tm-usecase" placeholder="Para batidos en el gym, oficina o viajes">
+      <div class="le-inline">
+        <div><label for="tm-size">📏 Tamaño</label><input type="text" id="tm-size" placeholder="20 × 8 cm" style="width:160px"></div>
+        <div><label for="tm-badge">🏷️ Badge</label><input type="text" id="tm-badge" placeholder="más vendido" style="width:160px"></div>
+        <div><label for="tm-rating">⭐ Rating</label><input type="number" id="tm-rating" min="0" max="5" step="0.1" style="width:90px"></div>
+        <div><label for="tm-reviews"># Reseñas</label><input type="number" id="tm-reviews" min="0" step="1" style="width:110px"></div>
+      </div>
       <div class="le-save-row">
-        <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar secciones</button>
+        <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar secciones y contenido</button>
         <span id="pe-landing-msg" aria-live="polite"></span>
       </div>
     </div>`;
   }
 
-  function peHydrate(L) {
+  function peHydrate(L, tm) {
     const sec = (L && L.sections) || {};
     PE_SECTIONS.forEach(([k]) => {
       const t = document.querySelector(`[data-sec="${k}"]`);
       if (t) t.checked = sec[k] !== false;
     });
+    tm = tm || {};
+    $('tm-benefits').value = (tm.benefits || []).join('\n');
+    $('tm-includes').value = tm.includes || '';
+    $('tm-warranty').value = tm.warranty || '';
+    $('tm-usecase').value = tm.use_case || '';
+    $('tm-size').value = tm.size || '';
+    $('tm-badge').value = tm.badge || '';
+    $('tm-rating').value = tm.rating || '';
+    $('tm-reviews').value = tm.reviews || '';
+  }
+
+  function peCollectTmMeta() {
+    return {
+      benefits: $('tm-benefits').value.split('\n').map((s) => s.trim()).filter(Boolean),
+      includes: $('tm-includes').value.trim(),
+      warranty: $('tm-warranty').value.trim(),
+      use_case: $('tm-usecase').value.trim(),
+      size: $('tm-size').value.trim(),
+      badge: $('tm-badge').value.trim(),
+      rating: parseFloat($('tm-rating').value) || 0,
+      reviews: parseInt($('tm-reviews').value, 10) || 0,
+    };
   }
 
   function peCollectLanding() {
@@ -689,7 +727,7 @@
       // landing: hidratar config existente (o defaults) + bind add/quitar
       const L = p.landing && Object.keys(p.landing).length ? { ...peDefaults(), ...p.landing } : peDefaults();
       if (!L.sections) L.sections = peDefaults().sections;
-      peHydrate(L);
+      peHydrate(L, p.tm_meta || {});
       peBindLanding();
 
       $('pe-back').addEventListener('click', () => { location.hash = '#/products'; });
@@ -712,6 +750,7 @@
           description: $('pe-desc').value,
           short_description: $('pe-short').value,
           landing: peCollectLanding(),
+          tm_meta: peCollectTmMeta(),
         };
         const stockRaw = $('pe-stock').value;
         if (stockRaw !== '') body.stock = parseInt(stockRaw, 10);

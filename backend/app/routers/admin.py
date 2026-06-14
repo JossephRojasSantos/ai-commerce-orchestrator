@@ -318,8 +318,10 @@ class ProductUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=50000)
     short_description: str | None = Field(default=None, max_length=10000)
     visible: bool | None = None
-    # Config de la landing por cajas (feature 019): secciones on/off + contenido editable
+    # Config de secciones on/off (feature 019)
     landing: dict | None = None
+    # Contenido editable de las secciones (_tm_* meta): benefits, includes, warranty, etc.
+    tm_meta: dict | None = None
 
 
 @router.get("/products/{product_id}")
@@ -350,6 +352,7 @@ async def update_product(
             req.short_description,
             req.visible,
             req.landing,
+            req.tm_meta,
         )
     ):
         raise HTTPException(status_code=422, detail="nothing_to_update") from None
@@ -363,6 +366,7 @@ async def update_product(
             short_description=req.short_description,
             visible=req.visible,
             landing=req.landing,
+            tm_meta=req.tm_meta,
         )
     except WCClientError as exc:
         if exc.status_code == 404:

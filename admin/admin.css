@@ -415,3 +415,20 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 .pe-thumb img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-input); border: 1px solid var(--color-border); }
 .pe-del { position: absolute; top: -6px; right: -6px; background: var(--color-danger, #dc2626); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; }
 .pe-upload-btn { display: inline-block; cursor: pointer; }
+
+/* ── Editor de landing por cajas (feature 019) ── */
+.le-toggles { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: var(--space-xs) 0 var(--space-sm); }
+.le-sec { font-size: 13px; }
+#pe-landing hr { border: none; border-top: 1px solid var(--color-border); margin: var(--space-sm) 0; }
+.le-inline { display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: flex-end; }
+.le-block { border: 1px solid var(--color-border); border-radius: var(--radius-input); padding: var(--space-sm); margin-top: var(--space-sm); }
+.le-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xs); }
+.le-head .le-add { padding: 6px 12px; font-size: 13px; }
+.le-rows { display: flex; flex-direction: column; gap: 6px; }
+.le-row { display: flex; gap: 6px; align-items: center; }
+.le-row input[type=text], .le-row input[type=number] {
+  flex: 1; min-width: 60px; padding: 7px 10px; border: 1px solid var(--color-border);
+  border-radius: var(--radius-input); font-family: var(--font-body); font-size: 13px;
+}
+.le-chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; flex: 0 0 auto; }
+.le-row .le-rm { flex: 0 0 auto; }

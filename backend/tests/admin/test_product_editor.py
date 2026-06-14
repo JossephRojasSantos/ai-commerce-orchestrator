@@ -28,6 +28,55 @@ async def test_product_detail_includes_description_images_visible(admin_client, 
 
 
 @pytest.mark.asyncio
+async def test_product_detail_includes_landing_config(admin_client, no_cache):
+    import json
+
+    p = make_product(99, price="490000")
+    p.setdefault("meta_data", []).append(
+        {
+            "key": "_tm_landing",
+            "value": json.dumps({"sections": {"faq": False}, "subtitle": "Gancho"}),
+        }
+    )
+    wc = MagicMock()
+    wc.get_product_raw = AsyncMock(return_value=p)
+    with patch(
+        "app.services.admin.products_admin.get_wc_client", new_callable=AsyncMock, return_value=wc
+    ):
+        resp = await admin_client.get("/v1/admin/products/99", headers=ADMIN_AUTH)
+    d = resp.json()
+    assert d["landing"]["subtitle"] == "Gancho"
+    assert d["landing"]["sections"]["faq"] is False
+
+
+@pytest.mark.asyncio
+async def test_update_landing_writes_meta(admin_client, no_cache):
+    import json
+
+    captured = {}
+
+    async def fake_update(pid, payload):
+        captured.update(payload)
+        return make_product(99)
+
+    wc = MagicMock()
+    wc.update_product = AsyncMock(side_effect=fake_update)
+    landing = {
+        "sections": {"hero": True},
+        "benefits": [{"icon": "🔋", "title": "USB", "text": "x"}],
+    }
+    with patch(
+        "app.services.admin.products_admin.get_wc_client", new_callable=AsyncMock, return_value=wc
+    ):
+        resp = await admin_client.put(
+            "/v1/admin/products/99", headers=ADMIN_AUTH, json={"landing": landing}
+        )
+    assert resp.status_code == 200
+    meta = {m["key"]: m["value"] for m in captured["meta_data"]}
+    assert json.loads(meta["_tm_landing"])["benefits"][0]["title"] == "USB"
+
+
+@pytest.mark.asyncio
 async def test_update_visible_toggles_status(admin_client, no_cache):
     captured = {}
 

@@ -1002,27 +1002,29 @@
         ${runLine}
         <div class="card"><h2>Ranking de candidatos (${data.candidates.length})</h2>
         <p><small>Velocidad de venta <strong>estimada</strong> por disminución de stock del proveedor — Dropi no publica ventas.</small></p>
-        <table class="keep-cols">
-          <thead><tr><th>Producto</th><th>Costo</th><th>Precio sug.</th><th>Margen</th><th>Stock</th><th>Vel. est./día</th><th>IA</th><th>Acciones</th></tr></thead>
+        <table class="keep-cols scout-table">
+          <thead><tr><th>Producto</th><th class="num">Costo</th><th class="num">Precio sug.</th><th class="num">Margen</th><th class="num">Stock</th><th class="num">Vel./día</th><th>IA</th><th>Acciones</th></tr></thead>
           <tbody>${data.candidates
             .map(
               (c) => `<tr data-pid="${c.dropi_product_id}">
               <td>${esc(c.name)}<br><small>${esc(c.category || '—')} · ${esc(c.supplier || '')}</small>
                 ${c.is_novelty ? '<span class="badge ok">🆕 novedad</span>' : ''}
                 ${c.is_viable ? '' : '<span class="badge alert">margen ≤ 0</span>'}</td>
-              <td>${fmtCOP(c.cost_price)}</td>
-              <td>${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
-              <td>${fmtPct(c.margin_pct)}</td>
-              <td>${c.stock_total}</td>
-              <td>${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
+              <td class="num">${fmtCOP(c.cost_price)}</td>
+              <td class="num">${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
+              <td class="num">${fmtPct(c.margin_pct)}</td>
+              <td class="num">${c.stock_total}</td>
+              <td class="num">${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
               <td>${
                 c.ai
                   ? `<strong>${c.ai.score}</strong>/100<br><small class="scout-reason">${esc(c.ai.reason)}</small>`
                   : '<span class="badge">sin evaluar</span>'
               }</td>
               <td class="scout-actions">
-                <button type="button" class="btn-cta scout-add" data-add="${c.dropi_product_id}" data-name="${esc(c.name)}">➕ Agregar a productos</button>
-                <a class="btn-ghost scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener">Ver en Dropi</a>
+                <div class="scout-act-row">
+                  <button type="button" class="btn-add scout-add" data-add="${c.dropi_product_id}" data-name="${esc(c.name)}" title="Agregar a mis productos">➕ Agregar</button>
+                  <a class="btn-dropi scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener" title="Ver en Dropi">Dropi ↗</a>
+                </div>
                 <span class="scout-add-msg" data-msg="${c.dropi_product_id}"></span>
               </td>
               </tr>`

@@ -355,11 +355,39 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 
 /* ── Scout (feature 014) ── */
 .scout-reason { color: var(--color-text-muted); display: inline-block; max-width: 260px; }
-.scout-link { white-space: nowrap; font-size: 13px; padding: 6px 10px; }
-.scout-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
-.scout-add-msg { font-size: 12px; }
-.scout-add-msg.ok { color: var(--color-success, #16a34a); }
-.scout-add-msg.err { color: var(--color-danger, #dc2626); }
+.scout-actions { white-space: nowrap; }
+.scout-act-row { display: inline-flex; gap: var(--space-xs); align-items: center; }
+.scout-add-msg { display: block; font-size: 12px; margin-top: 4px; min-height: 14px; }
+.scout-add-msg.ok { color: var(--color-success-dark); }
+.scout-add-msg.err { color: var(--color-warn-text); }
+
+/* Botones de acción compactos (igualan altura, sin desbordar la columna) */
+.btn-add, .btn-dropi {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.btn-add { background: var(--color-cta); color: var(--color-light); border: none; }
+.btn-add:hover { background: var(--color-cta-dark); }
+.btn-add:disabled { opacity: .6; cursor: default; }
+.btn-dropi {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  text-decoration: none;
+}
+.btn-dropi:hover { background: var(--color-surface); border-color: var(--color-primary); }
+
+/* Columnas numéricas alineadas a la derecha (legibilidad) */
+.scout-table th.num, .scout-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scout-table th, .scout-table td { padding: 12px var(--space-xs); vertical-align: middle; }
+.scout-table td:first-child { max-width: 320px; }
 
 /* ── Editor de productos (feature 015) ── */
 .prod-name.clickable { cursor: pointer; color: var(--color-primary); font-weight: 600; }

@@ -229,6 +229,35 @@ async def test_delete_image_keeps_others(admin_client, no_cache):
 
 
 @pytest.mark.asyncio
+async def test_upload_media_returns_url(admin_client):
+    from app.services.admin import media_store
+
+    with (
+        patch.object(media_store, "store_image", new=AsyncMock(return_value="rev123")),
+        patch.object(
+            media_store, "public_url", return_value="https://api.test/v1/public/media/rev123"
+        ),
+    ):
+        resp = await admin_client.post(
+            "/v1/admin/media",
+            files={"file": ("r.png", b"\x89PNGfake", "image/png")},
+            headers=ADMIN_AUTH,
+        )
+    assert resp.status_code == 201
+    assert resp.json()["url"] == "https://api.test/v1/public/media/rev123"
+
+
+@pytest.mark.asyncio
+async def test_upload_media_rejects_bad_mime(admin_client):
+    resp = await admin_client.post(
+        "/v1/admin/media",
+        files={"file": ("x.pdf", b"%PDF", "application/pdf")},
+        headers=ADMIN_AUTH,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_public_media_serves_stored_bytes(admin_client):
     from app.services.admin import media_store
 

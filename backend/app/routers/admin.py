@@ -376,6 +376,23 @@ async def update_product(
         raise HTTPException(status_code=502, detail="store_unavailable") from None
 
 
+@router.post("/media", status_code=201)
+async def upload_media(
+    file: UploadFile = File(...),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    """Sube una imagen suelta (p. ej. foto de reseña) y devuelve su URL pública."""
+    from app.services.admin import media_store
+
+    if file.content_type not in media_store.ALLOWED_MIME:
+        raise HTTPException(status_code=422, detail="formato_no_soportado") from None
+    content = await file.read()
+    if len(content) > media_store.MAX_BYTES:
+        raise HTTPException(status_code=413, detail="imagen_muy_grande") from None
+    media_id = await media_store.store_image(content, file.content_type)
+    return {"url": media_store.public_url(media_id)}
+
+
 @router.post("/products/{product_id}/image", status_code=201)
 async def upload_product_image(
     product_id: int,

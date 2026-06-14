@@ -587,49 +587,21 @@
   /* ── Vista: Editar producto (feature 015) ── */
   let adminConfig = null;
 
-  /* ── Editor de landing por cajas (feature 019) ── */
+  /* ── Editor de secciones del producto (feature 019, opción A) ──
+     Los toggles controlan qué secciones del template real ve el cliente.
+     Claves = secciones reales de templates/product.php en la tienda. */
   const PE_SECTIONS = [
-    ['hero', '🦸 Hero (galería, precio, escasez, CTA)'],
-    ['benefits', '✅ Beneficios'],
-    ['steps', '👣 Cómo funciona'],
-    ['compare', '📊 Comparativa'],
-    ['guarantee', '🛡️ Garantía'],
-    ['reviews', '⭐ Testimonios'],
-    ['faq', '❓ FAQ'],
+    ['benefits', '✅ Beneficios (bullets)'],
+    ['boxes', '📦 Incluye / Garantía'],
+    ['serve', '🪄 ¿Esto me sirve? (asistente IA)'],
+    ['reviews', '⭐ Reseñas verificadas'],
+    ['recs', '🔗 Recomendador (relacionados)'],
   ];
-  // definición de campos por lista repetible
-  const PE_FIELDS = {
-    benefits: [['icon', '🔋', 'icon'], ['title', 'Título', 'text'], ['text', 'Descripción', 'text']],
-    steps: [['title', 'Título del paso', 'text'], ['text', 'Detalle', 'text']],
-    compare: [['feature', 'Característica', 'text'], ['us', 'Nosotros', 'check'], ['common', 'Común', 'check'], ['others', 'Otras', 'check']],
-    reviews: [['stars', '5', 'stars'], ['who', 'Nombre', 'text'], ['text', 'Reseña', 'text']],
-    faq: [['q', 'Pregunta', 'text'], ['a', 'Respuesta', 'text']],
-  };
 
   function peDefaults() {
     const sections = {};
     PE_SECTIONS.forEach(([k]) => (sections[k] = true));
-    return { sections, subtitle: '', price_old: null, scarcity: { enabled: false, units: 10 }, benefits: [], steps: [], compare: [], reviews: [], faq: [] };
-  }
-
-  function peCellHtml(section, field) {
-    const [k, ph, type] = field;
-    if (type === 'check') return `<label class="le-chk" title="${esc(ph)}"><input type="checkbox" data-k="${k}"> ${esc(ph)}</label>`;
-    if (type === 'stars') return `<input type="number" data-k="${k}" min="1" max="5" step="1" placeholder="★" style="width:56px" title="Estrellas 1-5">`;
-    if (type === 'icon') return `<input type="text" data-k="${k}" maxlength="3" placeholder="${esc(ph)}" style="width:52px" title="Emoji">`;
-    return `<input type="text" data-k="${k}" placeholder="${esc(ph)}">`;
-  }
-
-  function peRowHtml(section, item = {}) {
-    const cells = PE_FIELDS[section].map((f) => peCellHtml(section, f)).join('');
-    return `<div class="le-row">${cells}<button type="button" class="pe-del le-rm" title="Quitar">✕</button></div>`;
-  }
-
-  function peListHtml(section, label) {
-    return `<div class="le-block" data-le="${section}">
-      <div class="le-head"><strong>${esc(label)}</strong><button type="button" class="btn-ghost le-add" data-add="${section}">➕ Añadir</button></div>
-      <div class="le-rows"></div>
-    </div>`;
+    return { sections };
   }
 
   function peLandingCardHtml() {
@@ -637,90 +609,34 @@
       ([k, label]) => `<label class="switch-inline le-sec"><input type="checkbox" data-sec="${k}"> ${esc(label)}</label>`
     ).join('');
     return `<div class="card" id="pe-landing">
-      <h2>🛒 Landing del producto (por secciones)</h2>
-      <p><small>Activa/desactiva cada sección y edita su contenido. Lo que desactives no se muestra al cliente.</small></p>
+      <h2>🧩 Secciones de la página del producto</h2>
+      <p><small>Activa o desactiva qué secciones ve el cliente en la tienda. Lo apagado no se muestra.</small></p>
       <div class="le-toggles">${toggles}</div>
-      <hr>
-      <label for="le-subtitle">Subtítulo (bajo el título)</label>
-      <input type="text" id="le-subtitle" placeholder="Frase corta de gancho">
-      <div class="le-inline">
-        <div><label for="le-price-old">Precio tachado (ancla)</label><input type="number" id="le-price-old" min="0" step="100" placeholder="116000"></div>
-        <div><label class="switch-inline"><input type="checkbox" id="le-scarcity-on"> Mostrar escasez</label>
-          <input type="number" id="le-scarcity-units" min="1" step="1" placeholder="unidades" style="width:120px"></div>
-      </div>
-      ${peListHtml('benefits', 'Beneficios (icono · título · texto)')}
-      ${peListHtml('steps', 'Cómo funciona (título · detalle)')}
-      ${peListHtml('compare', 'Comparativa (característica · nosotros/común/otras)')}
-      ${peListHtml('reviews', 'Testimonios (estrellas · nombre · reseña)')}
-      ${peListHtml('faq', 'FAQ (pregunta · respuesta)')}
       <div class="le-save-row">
-        <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar landing</button>
+        <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar secciones</button>
         <span id="pe-landing-msg" aria-live="polite"></span>
       </div>
     </div>`;
   }
 
-  // rellena los inputs de una fila con los valores del item
-  function peFillRow(rowEl, section, item) {
-    PE_FIELDS[section].forEach(([k, , type]) => {
-      const el = rowEl.querySelector(`[data-k="${k}"]`);
-      if (!el) return;
-      if (type === 'check') el.checked = !!item[k];
-      else el.value = item[k] ?? '';
-    });
-  }
-
   function peHydrate(L) {
-    PE_SECTIONS.forEach(([k]) => { const t = document.querySelector(`[data-sec="${k}"]`); if (t) t.checked = L.sections[k] !== false; });
-    $('le-subtitle').value = L.subtitle || '';
-    $('le-price-old').value = L.price_old ?? '';
-    $('le-scarcity-on').checked = !!(L.scarcity && L.scarcity.enabled);
-    $('le-scarcity-units').value = (L.scarcity && L.scarcity.units) || '';
-    Object.keys(PE_FIELDS).forEach((section) => {
-      const wrap = document.querySelector(`[data-le="${section}"] .le-rows`);
-      (L[section] || []).forEach((item) => {
-        wrap.insertAdjacentHTML('beforeend', peRowHtml(section));
-        peFillRow(wrap.lastElementChild, section, item);
-      });
+    const sec = (L && L.sections) || {};
+    PE_SECTIONS.forEach(([k]) => {
+      const t = document.querySelector(`[data-sec="${k}"]`);
+      if (t) t.checked = sec[k] !== false;
     });
   }
 
   function peCollectLanding() {
     const sections = {};
-    PE_SECTIONS.forEach(([k]) => { const t = document.querySelector(`[data-sec="${k}"]`); sections[k] = t ? t.checked : true; });
-    const L = {
-      sections,
-      subtitle: $('le-subtitle').value.trim(),
-      price_old: $('le-price-old').value ? parseInt($('le-price-old').value, 10) : null,
-      scarcity: { enabled: $('le-scarcity-on').checked, units: parseInt($('le-scarcity-units').value, 10) || 0 },
-    };
-    Object.keys(PE_FIELDS).forEach((section) => {
-      L[section] = [...document.querySelectorAll(`[data-le="${section}"] .le-row`)]
-        .map((row) => {
-          const o = {};
-          PE_FIELDS[section].forEach(([k, , type]) => {
-            const el = row.querySelector(`[data-k="${k}"]`);
-            o[k] = type === 'check' ? el.checked : type === 'stars' ? parseInt(el.value, 10) || 5 : el.value.trim();
-          });
-          return o;
-        })
-        .filter((o) => Object.entries(o).some(([, v]) => v !== '' && v !== false));
+    PE_SECTIONS.forEach(([k]) => {
+      const t = document.querySelector(`[data-sec="${k}"]`);
+      sections[k] = t ? t.checked : true;
     });
-    return L;
+    return { sections };
   }
 
-  function peBindLanding() {
-    $('pe-landing').addEventListener('click', (e) => {
-      const add = e.target.closest('.le-add');
-      if (add) {
-        const section = add.dataset.add;
-        document.querySelector(`[data-le="${section}"] .le-rows`).insertAdjacentHTML('beforeend', peRowHtml(section));
-        return;
-      }
-      const rm = e.target.closest('.le-rm');
-      if (rm) rm.closest('.le-row').remove();
-    });
-  }
+  function peBindLanding() {} // opción A: solo toggles, sin filas que enlazar
 
   async function viewProductEdit(id) {
     content().innerHTML = '<div id="pe-body">Cargando…</div>';

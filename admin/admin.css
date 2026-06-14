@@ -384,6 +384,12 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
 }
 .btn-dropi:hover { background: var(--color-surface); border-color: var(--color-primary); }
 
+/* Headers ordenables */
+.scout-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.scout-table th.sortable:hover { color: var(--color-primary); }
+.scout-table th.sortable:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.scout-table th.sorted { color: var(--color-primary); }
+
 /* Columnas numéricas alineadas a la derecha (legibilidad) */
 .scout-table th.num, .scout-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .scout-table th, .scout-table td { padding: 12px var(--space-xs); vertical-align: middle; }

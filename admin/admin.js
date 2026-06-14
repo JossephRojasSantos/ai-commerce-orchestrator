@@ -653,6 +653,10 @@
       ${peListHtml('compare', 'Comparativa (característica · nosotros/común/otras)')}
       ${peListHtml('reviews', 'Testimonios (estrellas · nombre · reseña)')}
       ${peListHtml('faq', 'FAQ (pregunta · respuesta)')}
+      <div class="le-save-row">
+        <button type="button" class="btn-cta" id="pe-landing-save">💾 Guardar landing</button>
+        <span id="pe-landing-msg" aria-live="polite"></span>
+      </div>
     </div>`;
   }
 
@@ -781,9 +785,11 @@
         } catch { e.target.checked = !e.target.checked; $('pe-msg').textContent = 'No se pudo cambiar'; }
       });
 
-      $('pe-save').addEventListener('click', async () => {
-        $('pe-save').disabled = true;
-        $('pe-msg').textContent = 'Guardando…';
+      const peSave = async (btn) => {
+        const buttons = ['pe-save', 'pe-landing-save'].map((x) => $(x)).filter(Boolean);
+        buttons.forEach((b) => (b.disabled = true));
+        const msgs = ['pe-msg', 'pe-landing-msg'].map((x) => $(x)).filter(Boolean);
+        msgs.forEach((m) => (m.textContent = 'Guardando…'));
         const body = {
           name: $('pe-name').value.trim(),
           price: parseFloat($('pe-price').value) || undefined,
@@ -795,11 +801,15 @@
         if (stockRaw !== '') body.stock = parseInt(stockRaw, 10);
         try {
           await apiFetch('/products/' + id, { method: 'PUT', body: JSON.stringify(body) });
-          $('pe-msg').textContent = '✅ Guardado — reflejado en la tienda';
+          msgs.forEach((m) => (m.textContent = '✅ Guardado — reflejado en la tienda'));
         } catch (err) {
-          $('pe-msg').textContent = 'No se pudo guardar: ' + err.message;
-        } finally { $('pe-save').disabled = false; }
-      });
+          msgs.forEach((m) => (m.textContent = 'No se pudo guardar: ' + err.message));
+        } finally {
+          buttons.forEach((b) => (b.disabled = false));
+        }
+      };
+      $('pe-save').addEventListener('click', peSave);
+      if ($('pe-landing-save')) $('pe-landing-save').addEventListener('click', peSave);
 
       $('pe-upload').addEventListener('change', async (e) => {
         const f = e.target.files[0];

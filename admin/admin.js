@@ -920,6 +920,110 @@
   /* ── Vista: Scout (feature 014) ── */
   const fmtPct = (n) => (n === null || n === undefined ? '—' : n.toFixed(1) + '%');
 
+  // Estado de la tabla Scout (ordenamiento por columna)
+  let scoutCands = [];
+  let scoutSort = { key: null, dir: 1 }; // dir: 1 asc, -1 desc
+
+  // valor para ordenar según la columna
+  const scoutVal = (c, key) =>
+    key === 'name' ? (c.name || '') : key === 'ai_score' ? (c.ai ? c.ai.score : null) : c[key];
+
+  function scoutSorted() {
+    if (!scoutSort.key) return scoutCands;
+    const { key, dir } = scoutSort;
+    return [...scoutCands].sort((a, b) => {
+      const va = scoutVal(a, key);
+      const vb = scoutVal(b, key);
+      if (typeof va === 'string' || typeof vb === 'string') {
+        return String(va).localeCompare(String(vb), 'es', { sensitivity: 'base' }) * dir;
+      }
+      // numérico: nulos siempre al final, sin importar la dirección
+      const na = va === null || va === undefined;
+      const nb = vb === null || vb === undefined;
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      return (va - vb) * dir;
+    });
+  }
+
+  function scoutTh(label, key, num) {
+    const active = scoutSort.key === key;
+    const arrow = active ? (scoutSort.dir === 1 ? ' ▲' : ' ▼') : '';
+    return `<th class="sortable${num ? ' num' : ''}${active ? ' sorted' : ''}" data-sort="${key}" role="button" tabindex="0" aria-sort="${active ? (scoutSort.dir === 1 ? 'ascending' : 'descending') : 'none'}">${label}${arrow}</th>`;
+  }
+
+  function scoutTableHtml() {
+    const rows = scoutSorted()
+      .map(
+        (c) => `<tr data-pid="${c.dropi_product_id}">
+        <td>${esc(c.name)}<br><small>${esc(c.category || '—')} · ${esc(c.supplier || '')}</small>
+          ${c.is_novelty ? '<span class="badge ok">🆕 novedad</span>' : ''}
+          ${c.is_viable ? '' : '<span class="badge alert">margen ≤ 0</span>'}</td>
+        <td class="num">${fmtCOP(c.cost_price)}</td>
+        <td class="num">${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
+        <td class="num">${fmtPct(c.margin_pct)}</td>
+        <td class="num">${c.stock_total}</td>
+        <td class="num">${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
+        <td>${
+          c.ai
+            ? `<strong>${c.ai.score}</strong>/100<br><small class="scout-reason">${esc(c.ai.reason)}</small>`
+            : '<span class="badge">sin evaluar</span>'
+        }</td>
+        <td class="scout-actions">
+          <div class="scout-act-row">
+            <button type="button" class="btn-add scout-add" data-add="${c.dropi_product_id}" data-name="${esc(c.name)}" title="Agregar a mis productos">➕ Agregar</button>
+            <a class="btn-dropi scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener" title="Ver en Dropi">Dropi ↗</a>
+          </div>
+          <span class="scout-add-msg" data-msg="${c.dropi_product_id}"></span>
+        </td>
+        </tr>`
+      )
+      .join('');
+    return `<table class="keep-cols scout-table">
+      <thead><tr>${scoutTh('Producto', 'name', false)}${scoutTh('Costo', 'cost_price', true)}${scoutTh('Precio sug.', 'suggested_price', true)}${scoutTh('Margen', 'margin_pct', true)}${scoutTh('Stock', 'stock_total', true)}${scoutTh('Vel./día', 'velocity_7d', true)}${scoutTh('IA', 'ai_score', false)}<th>Acciones</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }
+
+  function bindScoutTable() {
+    document.querySelectorAll('#scout-table-wrap th.sortable').forEach((th) => {
+      const sort = () => {
+        const k = th.dataset.sort;
+        if (scoutSort.key === k) scoutSort.dir *= -1;
+        else scoutSort = { key: k, dir: 1 };
+        $('scout-table-wrap').innerHTML = scoutTableHtml();
+        bindScoutTable();
+      };
+      th.addEventListener('click', sort);
+      th.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); } });
+    });
+    document.querySelectorAll('#scout-table-wrap [data-add]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const pid = btn.dataset.add;
+        const msg = document.querySelector(`[data-msg="${pid}"]`);
+        btn.disabled = true;
+        msg.textContent = '⏳ Importando…';
+        msg.className = 'scout-add-msg';
+        try {
+          const r = await apiFetch('/scout/import/' + pid, { method: 'POST' });
+          if (r.status === 'exists') {
+            msg.textContent = '✓ Ya estaba en la tienda';
+            msg.className = 'scout-add-msg ok';
+          } else {
+            const noImg = r.images_imported === false ? ' (sin fotos — agrégalas en el producto)' : '';
+            msg.innerHTML = '✅ Publicado en la tienda' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
+            msg.className = 'scout-add-msg ok';
+          }
+          btn.textContent = '✓ Agregado';
+        } catch (e) {
+          msg.textContent = e.message.startsWith('woocommerce_error') ? 'Error de WooCommerce' : 'No se pudo agregar';
+          msg.className = 'scout-add-msg err';
+          btn.disabled = false;
+        }
+      })
+    );
+  }
+
   async function viewScout() {
     const period = sessionStorage.getItem('tm_scout_period') || '7d';
     const category = sessionStorage.getItem('tm_scout_cat') || '';
@@ -998,65 +1102,14 @@
         return;
       }
 
+      scoutCands = data.candidates;
+      scoutSort = { key: null, dir: 1 }; // orden del servidor (ranking) por defecto
       $('scout-body').innerHTML = `
         ${runLine}
         <div class="card"><h2>Ranking de candidatos (${data.candidates.length})</h2>
-        <p><small>Velocidad de venta <strong>estimada</strong> por disminución de stock del proveedor — Dropi no publica ventas.</small></p>
-        <table class="keep-cols scout-table">
-          <thead><tr><th>Producto</th><th class="num">Costo</th><th class="num">Precio sug.</th><th class="num">Margen</th><th class="num">Stock</th><th class="num">Vel./día</th><th>IA</th><th>Acciones</th></tr></thead>
-          <tbody>${data.candidates
-            .map(
-              (c) => `<tr data-pid="${c.dropi_product_id}">
-              <td>${esc(c.name)}<br><small>${esc(c.category || '—')} · ${esc(c.supplier || '')}</small>
-                ${c.is_novelty ? '<span class="badge ok">🆕 novedad</span>' : ''}
-                ${c.is_viable ? '' : '<span class="badge alert">margen ≤ 0</span>'}</td>
-              <td class="num">${fmtCOP(c.cost_price)}</td>
-              <td class="num">${c.suggested_price ? fmtCOP(c.suggested_price) : '—'}</td>
-              <td class="num">${fmtPct(c.margin_pct)}</td>
-              <td class="num">${c.stock_total}</td>
-              <td class="num">${c.velocity_7d === null ? '—' : c.velocity_7d}</td>
-              <td>${
-                c.ai
-                  ? `<strong>${c.ai.score}</strong>/100<br><small class="scout-reason">${esc(c.ai.reason)}</small>`
-                  : '<span class="badge">sin evaluar</span>'
-              }</td>
-              <td class="scout-actions">
-                <div class="scout-act-row">
-                  <button type="button" class="btn-add scout-add" data-add="${c.dropi_product_id}" data-name="${esc(c.name)}" title="Agregar a mis productos">➕ Agregar</button>
-                  <a class="btn-dropi scout-link" href="${esc(c.dropi_url)}" target="_blank" rel="noopener" title="Ver en Dropi">Dropi ↗</a>
-                </div>
-                <span class="scout-add-msg" data-msg="${c.dropi_product_id}"></span>
-              </td>
-              </tr>`
-            )
-            .join('')}</tbody>
-        </table></div>`;
-
-      document.querySelectorAll('[data-add]').forEach((btn) =>
-        btn.addEventListener('click', async () => {
-          const pid = btn.dataset.add;
-          const msg = document.querySelector(`[data-msg="${pid}"]`);
-          btn.disabled = true;
-          msg.textContent = '⏳ Importando…';
-          msg.className = 'scout-add-msg';
-          try {
-            const r = await apiFetch('/scout/import/' + pid, { method: 'POST' });
-            if (r.status === 'exists') {
-              msg.textContent = '✓ Ya estaba en la tienda';
-              msg.className = 'scout-add-msg ok';
-            } else {
-              const noImg = r.images_imported === false ? ' (sin fotos — agrégalas en el producto)' : '';
-              msg.innerHTML = '✅ Publicado en la tienda' + noImg + (r.permalink ? ` · <a href="${esc(r.permalink)}" target="_blank" rel="noopener">ver</a>` : '');
-              msg.className = 'scout-add-msg ok';
-            }
-            btn.textContent = '✓ Agregado';
-          } catch (e) {
-            msg.textContent = e.message.startsWith('woocommerce_error') ? 'Error de WooCommerce' : 'No se pudo agregar';
-            msg.className = 'scout-add-msg err';
-            btn.disabled = false;
-          }
-        })
-      );
+        <p><small>Velocidad de venta <strong>estimada</strong> por disminución de stock del proveedor — Dropi no publica ventas. Clic en un título para ordenar.</small></p>
+        <div id="scout-table-wrap">${scoutTableHtml()}</div></div>`;
+      bindScoutTable();
     } catch (e) {
       if (e.message !== 'session') $('scout-body').innerHTML = errCard('No pudimos cargar el ranking Scout');
     }

@@ -15,6 +15,25 @@ logger = structlog.get_logger()
 _QUEUE_KEY = "whatsapp:messages:incoming"
 _BLPOP_TIMEOUT = 5
 
+# Placeholder legible por tipo para no perder contexto del hilo (feature 013)
+_MEDIA_LABELS = {
+    "image": "[imagen]",
+    "audio": "[audio]",
+    "voice": "[nota de voz]",
+    "video": "[video]",
+    "document": "[documento]",
+    "sticker": "[sticker]",
+    "location": "[ubicación]",
+    "contacts": "[contacto]",
+}
+
+
+def _media_placeholder(message: dict, msg_type: str) -> str:
+    """Etiqueta legible + caption del adjunto si viene."""
+    label = _MEDIA_LABELS.get(msg_type, f"[{msg_type or 'mensaje no soportado'}]")
+    caption = (message.get(msg_type) or {}).get("caption", "")
+    return f"{label} {caption}".strip() if caption else label
+
 
 async def _handle(message: dict) -> None:
     phone: str = message.get("from", "")
@@ -27,10 +46,12 @@ async def _handle(message: dict) -> None:
         text = message.get("button", {}).get("text", "")
     else:
         logger.info("wa.consumer.unsupported_type", msg_type=msg_type, phone=phone)
-        # Persistir placeholder para que el hilo no pierda contexto (feature 013)
+        # Persistir placeholder type-aware para que el hilo no pierda contexto (feature 013)
         if phone:
             with contextlib.suppress(Exception):
-                await wa_inbox.record_incoming(phone, "", name=profile_name or None)
+                await wa_inbox.record_incoming(
+                    phone, _media_placeholder(message, msg_type), name=profile_name or None
+                )
         return
 
     if not phone or not text:

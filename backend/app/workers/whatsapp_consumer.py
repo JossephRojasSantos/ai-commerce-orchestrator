@@ -76,9 +76,15 @@ async def _handle(message: dict) -> None:
             text=text,
             trace_id=trace_id,
         )
-        await send_text_message(phone=phone, text=result["reply"])
+        send_result = await send_text_message(phone=phone, text=result["reply"])
         with contextlib.suppress(Exception):
-            await wa_inbox.record_outgoing(phone, result["reply"], author="bot")
+            await wa_inbox.record_outgoing(
+                phone,
+                result["reply"],
+                author="bot",
+                delivered=send_result.status == "sent",
+                wa_message_id=send_result.message_id or None,
+            )
         logger.info(
             "wa.consumer.replied",
             phone=phone,

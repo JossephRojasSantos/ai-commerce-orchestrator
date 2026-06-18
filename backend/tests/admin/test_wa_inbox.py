@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS wa_messages (
     author TEXT NOT NULL,
     content TEXT NOT NULL,
     delivered BOOLEAN DEFAULT 1,
+    wa_message_id TEXT,
+    status TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -96,6 +98,34 @@ async def test_human_mode_blocks_bot_and_expires(wa_db):
     assert await wa_inbox.record_incoming("573009998877", "hola de nuevo") is True
     thread = await wa_inbox.get_thread("573009998877")
     assert thread["mode"] == "bot"
+
+
+@pytest.mark.asyncio
+async def test_outgoing_stores_wa_message_id_and_status(wa_db):
+    await wa_inbox.record_outgoing(
+        "573001112233", "respuesta", author="bot", wa_message_id="wamid.abc"
+    )
+    thread = await wa_inbox.get_thread("573001112233")
+    assert thread["messages"][0]["status"] == "sent"
+
+
+@pytest.mark.asyncio
+async def test_update_message_status_by_wa_id(wa_db):
+    await wa_inbox.record_outgoing(
+        "573001112233", "respuesta", author="bot", wa_message_id="wamid.abc"
+    )
+    assert await wa_inbox.update_message_status("wamid.abc", "read") is True
+    thread = await wa_inbox.get_thread("573001112233")
+    assert thread["messages"][0]["status"] == "read"
+    assert thread["messages"][0]["delivered"] is True
+
+    # failed marca delivered=False
+    assert await wa_inbox.update_message_status("wamid.abc", "failed") is True
+    thread = await wa_inbox.get_thread("573001112233")
+    assert thread["messages"][0]["delivered"] is False
+
+    # id desconocido → False, sin error
+    assert await wa_inbox.update_message_status("wamid.nope", "delivered") is False
 
 
 @pytest.mark.asyncio

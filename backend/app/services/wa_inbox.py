@@ -85,8 +85,17 @@ async def record_incoming(phone: str, content: str, name: str | None = None) -> 
     return bot_should_reply
 
 
-async def record_outgoing(phone: str, content: str, author: str, delivered: bool = True) -> None:
-    """Persiste un mensaje saliente (bot o admin). Best-effort para el flujo del bot."""
+async def record_outgoing(
+    phone: str,
+    content: str,
+    author: str,
+    delivered: bool = True,
+    wa_message_id: str | None = None,
+) -> None:
+    """Persiste un mensaje saliente (bot o admin). Best-effort para el flujo del bot.
+
+    wa_message_id (id de la Graph API) ancla los status callbacks posteriores.
+    """
     phone = normalize_phone(phone)
     now = _now()
     async with AsyncSessionLocal() as db:
@@ -99,9 +108,40 @@ async def record_outgoing(phone: str, content: str, author: str, delivered: bool
             await db.flush()
         conv.last_activity_at = now
         db.add(
-            WaMessage(conversation_id=conv.id, author=author, content=content, delivered=delivered)
+            WaMessage(
+                conversation_id=conv.id,
+                author=author,
+                content=content,
+                delivered=delivered,
+                wa_message_id=wa_message_id or None,
+                status="sent" if wa_message_id else None,
+            )
         )
         await db.commit()
+
+
+async def update_message_status(wa_message_id: str, status: str) -> bool:
+    """Actualiza el estado de entrega de un saliente por su id de la Graph API.
+
+    Estados Meta: sent < delivered < read < failed. Devuelve True si actualizó.
+    """
+    if not wa_message_id or not status:
+        return False
+    async with AsyncSessionLocal() as db:
+        msg = (
+            await db.execute(
+                select(WaMessage).where(WaMessage.wa_message_id == wa_message_id)
+            )
+        ).scalar_one_or_none()
+        if msg is None:
+            return False
+        msg.status = status
+        if status in ("delivered", "read"):
+            msg.delivered = True
+        elif status == "failed":
+            msg.delivered = False
+        await db.commit()
+    return True
 
 
 async def set_mode(phone: str, mode: str) -> WaConversation | None:
@@ -187,6 +227,7 @@ async def get_thread(phone: str) -> dict | None:
             "content": m.content,
             "date": m.created_at.isoformat() if m.created_at else "",
             "delivered": m.delivered,
+            "status": m.status,
         }
         for m in msgs
     ]

@@ -44,6 +44,10 @@ class WaMessage(Base):
     author: Mapped[str] = mapped_column(String(10), nullable=False)  # customer | bot | admin
     content: Mapped[str] = mapped_column(Text, nullable=False)
     delivered: Mapped[bool] = mapped_column(Boolean, default=True)
+    # ID del mensaje en la Graph API (solo salientes) — ancla para status callbacks
+    wa_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Estado de entrega Meta: sent | delivered | read | failed
+    status: Mapped[str | None] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, index=True
     )

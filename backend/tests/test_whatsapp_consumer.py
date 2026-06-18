@@ -64,6 +64,56 @@ async def test_handle_unsupported_type_ignored():
 
 
 @pytest.mark.asyncio
+async def test_handle_media_interpreted_when_enabled():
+    from app.config import settings
+    from app.workers.whatsapp_consumer import _handle
+
+    msg = {"from": "573001234567", "type": "image", "image": {"id": "m1"}, "id": "wamid.img"}
+
+    with (
+        patch.object(settings, "WA_MEDIA_ENABLED", True),
+        patch(
+            "app.integrations.whatsapp.media.media_to_text",
+            new_callable=AsyncMock,
+            return_value="foto de un producto",
+        ),
+        patch(
+            "app.workers.whatsapp_consumer.process_message",
+            new_callable=AsyncMock,
+            return_value=_make_process_result(),
+        ) as mock_proc,
+        patch("app.workers.whatsapp_consumer.send_text_message", new_callable=AsyncMock),
+    ):
+        await _handle(msg)
+
+    mock_proc.assert_called_once()
+    assert mock_proc.call_args.kwargs["text"] == "foto de un producto"
+
+
+@pytest.mark.asyncio
+async def test_handle_media_falls_back_to_placeholder_when_interpret_empty():
+    from app.config import settings
+    from app.workers.whatsapp_consumer import _handle
+
+    msg = {"from": "573001234567", "type": "image", "image": {"id": "m1"}, "id": "wamid.img"}
+
+    with (
+        patch.object(settings, "WA_MEDIA_ENABLED", True),
+        patch(
+            "app.integrations.whatsapp.media.media_to_text",
+            new_callable=AsyncMock,
+            return_value="",
+        ),
+        patch(
+            "app.workers.whatsapp_consumer.process_message", new_callable=AsyncMock
+        ) as mock_proc,
+    ):
+        await _handle(msg)
+
+    mock_proc.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_handle_button_message_processed():
     from app.workers.whatsapp_consumer import _handle
 

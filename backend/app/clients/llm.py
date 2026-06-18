@@ -55,3 +55,27 @@ async def chat_complete(
         data = resp.json()
         _record_usage_background(data)
         return data["choices"][0]["message"]["content"]
+
+
+async def multimodal_complete(
+    content: list[dict],
+    model: str,
+    temperature: float = 0.0,
+) -> str:
+    """Una sola vuelta multimodal: un mensaje user con partes (text/image_url/input_audio).
+
+    Usado para interpretar adjuntos de WhatsApp (Fase 3). El formato de `content`
+    sigue la API OpenAI-compatible de OpenRouter.
+    """
+    messages = [{"role": "user", "content": content}]
+    payload: dict = {"model": model, "messages": messages, "temperature": temperature}
+    async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
+        resp = await client.post(
+            f"{settings.LLM_API_BASE}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        _record_usage_background(data)
+        return data["choices"][0]["message"]["content"]

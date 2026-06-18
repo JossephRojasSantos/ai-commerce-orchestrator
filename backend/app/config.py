@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     WA_APP_SECRET: str = ""
     WA_API_VERSION: str = "v23.0"
     WA_RATE_LIMIT_PER_HOUR: int = 10
+    # Fase 3 — interpretación de adjuntos (imagen/audio) vía LLM multimodal.
+    # OFF por defecto: hasta activarlo, los adjuntos caen al placeholder type-aware.
+    WA_MEDIA_ENABLED: bool = False
+    WA_MEDIA_MAX_BYTES: int = 5_242_880  # 5 MB — descarta adjuntos mayores
 
     # LLM
     LLM_API_KEY: str = ""
@@ -42,6 +46,8 @@ class Settings(BaseSettings):
     LLM_MODEL_CHAT: str = "openai/gpt-4o-mini"
     LLM_MODEL_ROUTER: str = "google/gemini-2.0-flash"
     LLM_MODEL_WHATSAPP: str = "openai/gpt-4o-mini"
+    LLM_MODEL_VISION: str = "openai/gpt-4o-mini"  # describe/OCR de imágenes WhatsApp
+    LLM_MODEL_AUDIO: str = "google/gemini-2.0-flash"  # transcribe notas de voz (input_audio)
     LLM_FALLBACK_CHAT: str = "anthropic/claude-haiku-4-5"
     LLM_FALLBACK_ROUTER: str = "meta-llama/llama-3.1-8b-instruct"
     LLM_TIMEOUT: float = 30.0

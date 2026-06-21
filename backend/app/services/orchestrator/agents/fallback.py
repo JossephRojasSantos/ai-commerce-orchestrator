@@ -3,6 +3,7 @@ import unicodedata
 import structlog
 from langchain_core.messages import AIMessage
 
+from app.services.orchestrator.agents import chat
 from app.services.orchestrator.state import ConversationState
 
 logger = structlog.get_logger()
@@ -62,9 +63,11 @@ def _normalize(text: str) -> str:
     return "".join(c for c in text if unicodedata.category(c) != "Mn").strip(" ¡!¿?.,")
 
 
-def _resolve_reply(text: str) -> str:
+def _resolve_reply(text: str) -> str | None:
+    """Respuesta rápida sin LLM para saludo/cortesía/FAQ. None si no hay match."""
     norm = _normalize(text)
-    tokens = set(norm.split())
+    # Quita puntuación interna por token: "hola!" -> "hola" (antes no matcheaba).
+    tokens = {t.strip(" ¡!¿?.,") for t in norm.split()}
 
     if tokens & _GREETINGS or any(p in norm for p in _GREETING_PHRASES):
         return _REPLY_GREETING
@@ -78,7 +81,7 @@ def _resolve_reply(text: str) -> str:
         return _REPLY_PAYMENT
     if any(k in norm for k in _FAQ_RETURNS):
         return _REPLY_RETURNS
-    return _REPLY_DEFAULT
+    return None
 
 
 async def run(state: ConversationState) -> dict:
@@ -86,10 +89,16 @@ async def run(state: ConversationState) -> dict:
     user_text = last.content if hasattr(last, "content") else str(last)
     reply = _resolve_reply(user_text)
 
-    logger.warning(
-        "fallback_agent_triggered",
-        intent=state.get("intent"),
-        session_id=state.get("session_id"),
-        trace_id=state.get("trace_id"),
-    )
-    return {"messages": [AIMessage(content=reply)], "agent": "fallback"}
+    # Saludo/cortesía/FAQ → respuesta rápida enlatada (sin coste LLM).
+    if reply is not None:
+        logger.info("fallback_fast_reply", session_id=state.get("session_id"))
+        return {"messages": [AIMessage(content=reply)], "agent": "fallback"}
+
+    # Catch-all → delega al agente conversacional (LLM con historial) en vez del
+    # mensaje muerto "No estoy seguro de haber entendido".
+    logger.info("fallback_escalates_to_chat", session_id=state.get("session_id"))
+    try:
+        return await chat.run(state)
+    except Exception as exc:  # noqa: BLE001 — degradación: LLM caído → enlatado
+        logger.warning("fallback_chat_failed", error=str(exc), trace_id=state.get("trace_id"))
+        return {"messages": [AIMessage(content=_REPLY_DEFAULT)], "agent": "fallback"}

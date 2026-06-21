@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from app.clients.llm import chat_complete
+from app.clients.llm import chat_complete, multimodal_complete
 
 
 def _mock_response(content: str = "OK") -> MagicMock:
@@ -120,3 +120,31 @@ async def test_chat_complete_raises_on_http_error():
 
         with pytest.raises(httpx.HTTPStatusError):
             await chat_complete([{"role": "user", "content": "test"}])
+
+
+@pytest.mark.asyncio
+async def test_multimodal_complete_wraps_content_in_user_message():
+    captured = {}
+
+    async def fake_post(url, headers=None, json=None, **kwargs):
+        captured["json"] = json
+        return _mock_response("una imagen de un producto")
+
+    parts = [
+        {"type": "text", "text": "describe"},
+        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,xx"}},
+    ]
+    with patch("app.clients.llm.httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=fake_post)
+        mock_client_cls.return_value = mock_client
+
+        result = await multimodal_complete(parts, model="openai/gpt-4o-mini")
+
+    assert result == "una imagen de un producto"
+    msg = captured["json"]["messages"][0]
+    assert msg["role"] == "user"
+    assert msg["content"] == parts
+    assert captured["json"]["model"] == "openai/gpt-4o-mini"

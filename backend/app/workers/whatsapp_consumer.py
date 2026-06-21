@@ -5,6 +5,7 @@ import uuid
 
 import structlog
 
+from app.config import settings
 from app.core.cache import get_redis
 from app.integrations.whatsapp.client import send_text_message
 from app.services import wa_inbox
@@ -15,22 +16,53 @@ logger = structlog.get_logger()
 _QUEUE_KEY = "whatsapp:messages:incoming"
 _BLPOP_TIMEOUT = 5
 
+# Placeholder legible por tipo para no perder contexto del hilo (feature 013)
+_MEDIA_LABELS = {
+    "image": "[imagen]",
+    "audio": "[audio]",
+    "voice": "[nota de voz]",
+    "video": "[video]",
+    "document": "[documento]",
+    "sticker": "[sticker]",
+    "location": "[ubicación]",
+    "contacts": "[contacto]",
+}
+
+
+def _media_placeholder(message: dict, msg_type: str) -> str:
+    """Etiqueta legible + caption del adjunto si viene."""
+    label = _MEDIA_LABELS.get(msg_type, f"[{msg_type or 'mensaje no soportado'}]")
+    caption = (message.get(msg_type) or {}).get("caption", "")
+    return f"{label} {caption}".strip() if caption else label
+
 
 async def _handle(message: dict) -> None:
     phone: str = message.get("from", "")
     msg_type: str = message.get("type", "")
     profile_name: str = message.get("profile_name", "")
 
+    text: str = ""
     if msg_type == "text":
-        text: str = message.get("text", {}).get("body", "")
+        text = message.get("text", {}).get("body", "")
     elif msg_type == "button":
         text = message.get("button", {}).get("text", "")
-    else:
+    elif settings.WA_MEDIA_ENABLED and msg_type in ("image", "audio", "voice"):
+        # Fase 3 — interpreta el adjunto a texto vía LLM multimodal
+        from app.integrations.whatsapp.media import media_to_text
+
+        with contextlib.suppress(Exception):
+            text = await media_to_text(message, msg_type)
+        if text:
+            logger.info("wa.consumer.media_interpreted", msg_type=msg_type, phone=phone)
+
+    if not text and msg_type not in ("text", "button"):
         logger.info("wa.consumer.unsupported_type", msg_type=msg_type, phone=phone)
-        # Persistir placeholder para que el hilo no pierda contexto (feature 013)
+        # Persistir placeholder type-aware para que el hilo no pierda contexto (feature 013)
         if phone:
             with contextlib.suppress(Exception):
-                await wa_inbox.record_incoming(phone, "", name=profile_name or None)
+                await wa_inbox.record_incoming(
+                    phone, _media_placeholder(message, msg_type), name=profile_name or None
+                )
         return
 
     if not phone or not text:
@@ -55,9 +87,15 @@ async def _handle(message: dict) -> None:
             text=text,
             trace_id=trace_id,
         )
-        await send_text_message(phone=phone, text=result["reply"])
+        send_result = await send_text_message(phone=phone, text=result["reply"])
         with contextlib.suppress(Exception):
-            await wa_inbox.record_outgoing(phone, result["reply"], author="bot")
+            await wa_inbox.record_outgoing(
+                phone,
+                result["reply"],
+                author="bot",
+                delivered=send_result.status == "sent",
+                wa_message_id=send_result.message_id or None,
+            )
         logger.info(
             "wa.consumer.replied",
             phone=phone,

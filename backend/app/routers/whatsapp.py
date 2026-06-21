@@ -54,6 +54,17 @@ async def receive_webhook(request: Request) -> dict:
         for change in entry.get("changes", []):
             if change.get("field") != "messages":
                 continue
+
+            # Status callbacks de entrega (sent/delivered/read/failed) — Fase 2
+            for status in change.get("value", {}).get("statuses", []):
+                if status.get("id"):
+                    await redis.rpush("whatsapp:statuses:incoming", json.dumps(status))
+                    logger.debug(
+                        "wa.webhook.status",
+                        message_id=status.get("id"),
+                        status=status.get("status"),
+                    )
+
             # Nombre del contacto para la bandeja (feature 013)
             contacts = change.get("value", {}).get("contacts", [])
             profile_name = (

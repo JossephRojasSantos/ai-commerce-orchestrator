@@ -178,6 +178,47 @@ async def test_webhook_receive_duplicate_message_skipped(wa_client):
 
 
 @pytest.mark.asyncio
+async def test_webhook_receive_enqueues_status(wa_client):
+    payload = {
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "statuses": [
+                                {
+                                    "id": "wamid.out001",
+                                    "status": "delivered",
+                                    "recipient_id": "573001112233",
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        ]
+    }
+    body = json.dumps(payload).encode()
+    sig = _sign(body)
+
+    mock_redis = AsyncMock()
+    mock_redis.rpush = AsyncMock()
+
+    with _patch_settings(), patch("app.routers.whatsapp.get_redis", return_value=mock_redis):
+        resp = await wa_client.post(
+            "/api/whatsapp/webhook",
+            content=body,
+            headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        )
+    assert resp.status_code == 200
+    mock_redis.rpush.assert_called_once()
+    args = mock_redis.rpush.call_args[0]
+    assert args[0] == "whatsapp:statuses:incoming"
+    assert json.loads(args[1])["status"] == "delivered"
+
+
+@pytest.mark.asyncio
 async def test_webhook_receive_non_messages_field_ignored(wa_client):
     payload = {"entry": [{"changes": [{"field": "statuses", "value": {}}]}]}
     body = json.dumps(payload).encode()

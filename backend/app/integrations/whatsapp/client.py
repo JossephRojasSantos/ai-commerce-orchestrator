@@ -12,6 +12,24 @@ _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
 
+def _parse_meta_error(response: httpx.Response) -> tuple[int | None, str]:
+    """Extrae (code, message) del error de la Graph API.
+
+    Códigos frecuentes: 132xxx template no aprobado, 131047/131026 fuera de
+    ventana de 24h, 130472 user-experiment. Cae a texto crudo si no es JSON.
+    """
+    try:
+        err = response.json().get("error", {})
+        code = err.get("code")
+        message = err.get("message") or response.text[:200]
+        subcode = err.get("error_subcode")
+        if subcode:
+            message = f"{message} (subcode={subcode})"
+        return (int(code) if code is not None else None, message)
+    except (ValueError, AttributeError):
+        return (None, response.text[:200])
+
+
 async def send_text_message(phone: str, text: str) -> WASendResult:
     return await send_whatsapp_message(phone=phone, text=text)
 
@@ -81,11 +99,19 @@ async def send_whatsapp_message(
                 await asyncio.sleep(2**attempt)
                 continue
 
-            logger.error("wa.send_error", status=r.status_code, body=r.text)
+            err_code, err_msg = _parse_meta_error(r)
+            logger.error(
+                "wa.send_error",
+                status=r.status_code,
+                error_code=err_code,
+                error_message=err_msg,
+                template=template_name,
+            )
             return WASendResult(
                 message_id="",
                 status="failed",
-                error=f"HTTP {r.status_code}: {r.text[:200]}",
+                error=f"HTTP {r.status_code}: {err_msg}",
+                error_code=err_code,
             )
 
         except httpx.RequestError as exc:

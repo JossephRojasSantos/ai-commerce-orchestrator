@@ -19,14 +19,18 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.workers.wa_status_consumer import run_status_consumer
     from app.workers.whatsapp_consumer import run_consumer
 
     stop_event = asyncio.Event()
-    task = asyncio.create_task(run_consumer(stop_event))
+    tasks = [
+        asyncio.create_task(run_consumer(stop_event)),
+        asyncio.create_task(run_status_consumer(stop_event)),
+    ]
     yield
     stop_event.set()
     with contextlib.suppress(TimeoutError, asyncio.CancelledError):
-        await asyncio.wait_for(task, timeout=10)
+        await asyncio.wait_for(asyncio.gather(*tasks), timeout=10)
 
 
 def create_app() -> FastAPI:

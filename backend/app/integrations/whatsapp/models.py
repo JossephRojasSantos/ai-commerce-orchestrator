@@ -41,3 +41,4 @@ class WASendResult(BaseModel):
     message_id: str
     status: Literal["sent", "failed"]
     error: str | None = None
+    error_code: int | None = None

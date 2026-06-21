@@ -59,6 +59,28 @@ async def test_send_text_message_non_retryable_error():
 
 
 @pytest.mark.asyncio
+async def test_send_error_parses_meta_code_and_subcode():
+    resp = _mock_resp(
+        400,
+        {
+            "error": {
+                "code": 132001,
+                "message": "Template name does not exist",
+                "error_subcode": 2494010,
+            }
+        },
+    )
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
+        result = await send_text_message("521234567890", "test")
+    assert result.status == "failed"
+    assert result.error_code == 132001
+    assert "Template name does not exist" in result.error
+    assert "2494010" in result.error
+
+
+@pytest.mark.asyncio
 async def test_send_text_message_request_error():
     import httpx
 

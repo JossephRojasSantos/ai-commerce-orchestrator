@@ -1,3 +1,5 @@
+import logging
+import sys
 import time
 import uuid
 
@@ -92,6 +94,15 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 
 def setup_logging(settings) -> None:
+    # structlog enruta por stdlib logging; sin handler en root los INFO se descartan.
+    # uvicorn fija propagate=False en sus loggers → este handler no duplica access logs.
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.INFO if settings.APP_ENV == "production" else logging.DEBUG,
+        force=True,
+    )
+
     processors = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,

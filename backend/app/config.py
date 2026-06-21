@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     WA_ACCESS_TOKEN: str = ""
     WA_WEBHOOK_VERIFY_TOKEN: str = ""
     WA_APP_SECRET: str = ""
-    WA_API_VERSION: str = "v23.0"
+    WA_API_VERSION: str = "v25.0"
     WA_RATE_LIMIT_PER_HOUR: int = 10
     # Fase 3 — interpretación de adjuntos (imagen/audio) vía LLM multimodal.
     # OFF por defecto: hasta activarlo, los adjuntos caen al placeholder type-aware.

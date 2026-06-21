@@ -104,9 +104,7 @@ async def test_handle_media_falls_back_to_placeholder_when_interpret_empty():
             new_callable=AsyncMock,
             return_value="",
         ),
-        patch(
-            "app.workers.whatsapp_consumer.process_message", new_callable=AsyncMock
-        ) as mock_proc,
+        patch("app.workers.whatsapp_consumer.process_message", new_callable=AsyncMock) as mock_proc,
     ):
         await _handle(msg)
 

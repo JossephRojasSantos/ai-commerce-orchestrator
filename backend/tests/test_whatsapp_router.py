@@ -187,8 +187,11 @@ async def test_webhook_receive_enqueues_status(wa_client):
                         "field": "messages",
                         "value": {
                             "statuses": [
-                                {"id": "wamid.out001", "status": "delivered",
-                                 "recipient_id": "573001112233"}
+                                {
+                                    "id": "wamid.out001",
+                                    "status": "delivered",
+                                    "recipient_id": "573001112233",
+                                }
                             ]
                         },
                     }

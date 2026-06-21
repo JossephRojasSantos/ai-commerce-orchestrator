@@ -83,7 +83,9 @@ async def test_interpret_media_empty_returns_empty():
 @pytest.mark.asyncio
 async def test_media_to_text_pipeline():
     with (
-        patch.object(media, "download_media", new_callable=AsyncMock, return_value=(b"x", "image/jpeg")),
+        patch.object(
+            media, "download_media", new_callable=AsyncMock, return_value=(b"x", "image/jpeg")
+        ),
         patch.object(media, "interpret_media", new_callable=AsyncMock, return_value="texto"),
     ):
         out = await media.media_to_text({"image": {"id": "m1"}}, "image")

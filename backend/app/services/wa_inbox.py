@@ -129,9 +129,7 @@ async def update_message_status(wa_message_id: str, status: str) -> bool:
         return False
     async with AsyncSessionLocal() as db:
         msg = (
-            await db.execute(
-                select(WaMessage).where(WaMessage.wa_message_id == wa_message_id)
-            )
+            await db.execute(select(WaMessage).where(WaMessage.wa_message_id == wa_message_id))
         ).scalar_one_or_none()
         if msg is None:
             return False

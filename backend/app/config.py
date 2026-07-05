@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     # Vender por debajo → Dropi rechaza el pedido COD ("monto a ganar ≤ 0"). 0 = solo break-even.
     ADMIN_MIN_MARGIN: int = 0
 
+    # Tienda headless Next.js (fase 2 migración WP) — secreto compartido con Hostinger
+    STORE_API_SECRET: str = ""
+
     # MFA del panel (TOTP + respaldo WhatsApp)
     ADMIN_TOTP_SECRET: str = ""  # base32; si vacío, MFA deshabilitado (no enrolado)
     ADMIN_PHONE: str = ""  # E.164 sin '+' (ej. 573166235026) para el código de respaldo

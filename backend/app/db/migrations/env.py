@@ -10,6 +10,7 @@ from app.models import (  # noqa: F401  — registers models in Base.metadata
     ai_usage,
     conversation,
     scout,
+    store,
     wa_conversation,
 )
 

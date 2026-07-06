@@ -43,7 +43,11 @@ async def list_products(db: AsyncSession) -> list[dict]:
     if cached is not None:
         return cached
     rows = (
-        (await db.execute(select(StoreProduct).where(StoreProduct.active).order_by(StoreProduct.id)))
+        (
+            await db.execute(
+                select(StoreProduct).where(StoreProduct.active).order_by(StoreProduct.id)
+            )
+        )
         .scalars()
         .all()
     )
@@ -54,9 +58,7 @@ async def list_products(db: AsyncSession) -> list[dict]:
 
 async def get_product(db: AsyncSession, slug: str) -> dict | None:
     row = (
-        await db.execute(
-            select(StoreProduct).where(StoreProduct.slug == slug, StoreProduct.active)
-        )
+        await db.execute(select(StoreProduct).where(StoreProduct.slug == slug, StoreProduct.active))
     ).scalar_one_or_none()
     return _to_dto(row) if row else None
 
@@ -86,7 +88,9 @@ async def save_order(db: AsyncSession, payload: dict) -> int:
     await db.commit()
     row = result.scalar_one_or_none()
     if row is None:
-        logger.info("store_order duplicada (reintento frontend)", shop_order_id=payload["shopOrderId"])
+        logger.info(
+            "store_order duplicada (reintento frontend)", shop_order_id=payload["shopOrderId"]
+        )
         existing = (
             await db.execute(
                 select(StoreOrder.id).where(StoreOrder.shop_order_id == str(payload["shopOrderId"]))

@@ -66,9 +66,7 @@ async def test_list_products(store_client):
 
 @pytest.mark.asyncio
 async def test_product_by_slug_404(store_client):
-    with patch(
-        "app.routers.store.store.get_product", new_callable=AsyncMock, return_value=None
-    ):
+    with patch("app.routers.store.store.get_product", new_callable=AsyncMock, return_value=None):
         resp = await store_client.get("/v1/store/products/no-existe", headers=AUTH)
     assert resp.status_code == 404
 

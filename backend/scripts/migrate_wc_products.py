@@ -10,6 +10,7 @@ de nuevo sincroniza cambios.
 Usage:
     python scripts/migrate_wc_products.py [--dry-run]
 """
+
 from __future__ import annotations
 
 import argparse

@@ -34,6 +34,16 @@ logger = structlog.get_logger()
 _DROPI_ID_KEY = "_dropi_product_id"
 _SUPPLIER_ID_RE = re.compile(r's:7:"user_id";(?:s:\d+:"(\d+)"|i:(\d+))')
 
+# La media de productos se sirve desde Oracle (nginx /media/), no desde WP, para
+# que las imágenes sobrevivan al apagado de WordPress. Reescribir al migrar evita
+# que un re-run devuelva las URLs a tiendamagica.shop.
+_WP_UPLOADS = "https://tiendamagica.shop/wp-content/uploads/"
+_MEDIA_BASE = "https://api.tiendamagica.shop/media/"
+
+
+def _rewrite_media(src: str) -> str:
+    return src.replace(_WP_UPLOADS, _MEDIA_BASE) if src else src
+
 
 def _meta(meta_data: list, key: str):
     for m in meta_data or []:
@@ -71,7 +81,7 @@ def _to_row(p: dict) -> dict:
         "dropi_product_id": int(dropi_id) if dropi_id else None,
         "dropi_supplier_id": _extract_supplier_id(meta),
         "supplier_cost": _extract_supplier_cost(meta),
-        "images": [img.get("src", "") for img in p.get("images") or []],
+        "images": [_rewrite_media(img.get("src", "")) for img in p.get("images") or []],
         "content": content,
         "active": p.get("status") == "publish",
     }

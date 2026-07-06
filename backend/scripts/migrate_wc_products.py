@@ -21,7 +21,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import structlog
-
 from app.clients.woocommerce import get_wc_client
 from app.services.admin.products_admin import (
     _extract_landing,
@@ -92,15 +91,14 @@ async def run(dry_run: bool) -> None:
                 dropi_id=r["dropi_product_id"],
                 supplier=r["dropi_supplier_id"],
                 active=r["active"],
-                reviews=len((r["content"].get("reviews") or [])),
+                reviews=len(r["content"].get("reviews") or []),
             )
         return
 
     # Imports diferidos: el dry-run funciona sin la migración store_tables aplicada
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
     from app.db.base import AsyncSessionLocal
     from app.models.store import StoreProduct
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     async with AsyncSessionLocal() as db:
         for r in rows:

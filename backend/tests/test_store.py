@@ -3,10 +3,9 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.config import settings
 from app.main import app
+from httpx import ASGITransport, AsyncClient
 
 SECRET = "store-test-secret"
 AUTH = {"X-Store-Secret": SECRET}

@@ -118,12 +118,13 @@ async def invalidate_cache() -> None:
 async def save_order(db: AsyncSession, payload: dict) -> int:
     """Upsert idempotente por shop_order_id (el frontend puede reintentar)."""
     dropi = payload.get("dropi") or {}
-    dropi_order = dropi.get("order") if isinstance(dropi.get("order"), dict) else {}
+    # Dropi devuelve la orden creada en `objects` (objects.id = id real de la orden).
+    dropi_obj = dropi.get("objects") if isinstance(dropi.get("objects"), dict) else {}
     stmt = (
         pg_insert(StoreOrder)
         .values(
             shop_order_id=str(payload["shopOrderId"]),
-            dropi_order_id=dropi_order.get("id"),
+            dropi_order_id=dropi_obj.get("id"),
             total=payload.get("total") or 0,
             customer=payload.get("cliente") or {},
             products=payload.get("productos") or [],

@@ -18,23 +18,71 @@ _CACHE_LIST = "store:products"
 _CACHE_TTL = 120
 
 
+def _as_list(v) -> list:
+    return v if isinstance(v, list) else []
+
+
 def _to_dto(p: StoreProduct) -> dict:
+    """Mapea contenido WP (metas _tm_* + _tm_landing) al DTO del frontend.
+
+    Ojo: `content["reviews"]` (meta _tm_reviews) es el CONTADOR mostrado en la
+    tarjeta ("210 reseñas"); las reseñas reales editables del panel viven en
+    `content["landing"]["reviews"]` con formato {name, city, stars, text, image}
+    (feature 019, ver tm-landing.php). FAQ usa {q, a}; escasez `scarcity_units`.
+    """
     content = p.content or {}
+    landing = content.get("landing")
+    if not isinstance(landing, dict):
+        landing = {}
+
+    resenas = [
+        {
+            "autor": f"{r.get('name') or 'Cliente verificado'} — {r.get('city') or 'Colombia'}",
+            "estrellas": max(1, min(5, int(r.get("stars") or 5))),
+            "texto": r["text"],
+            "foto": r.get("image") or None,
+        }
+        for r in _as_list(landing.get("reviews"))
+        if isinstance(r, dict) and r.get("text")
+    ]
+    faq = [
+        {"pregunta": f.get("q") or "", "respuesta": f.get("a") or ""}
+        for f in _as_list(landing.get("faq"))
+        if isinstance(f, dict) and f.get("q")
+    ]
+    try:
+        scarcity = int(landing.get("scarcity_units") or 0)
+    except (TypeError, ValueError):
+        scarcity = 0
+
+    # Precio ancla: price_old de la landing manda; si no, el regular_price migrado
+    try:
+        price_old = float(landing.get("price_old") or 0)
+    except (TypeError, ValueError):
+        price_old = 0
+    anchor = p.anchor_price if p.anchor_price is not None else None
+    if price_old > float(p.price):
+        anchor = price_old
+
     return {
         "slug": p.slug,
         "nombre": p.name,
         "precioVenta": float(p.price),
-        "precioAncla": float(p.anchor_price) if p.anchor_price is not None else None,
+        "precioAncla": float(anchor) if anchor is not None else None,
         "dropiId": p.dropi_product_id,
         "supplierId": p.dropi_supplier_id,
         "descripcion": p.description,
         "descripcionCorta": p.short_description,
-        "galeria": p.images or [],
-        "resenas": content.get("reviews") or [],
-        "faq": content.get("faq") or [],
-        "comparativa": content.get("comparativa"),
-        "escasez": content.get("escasez"),
-        "contenido": content,  # resto de secciones editables (benefits, landing…)
+        "galeria": _as_list(p.images),
+        "resenas": resenas,
+        "faq": faq,
+        "comparativa": _as_list(landing.get("compare")) or None,
+        "escasez": (
+            {"activa": True, "mensaje": f"¡Quedan solo {scarcity} unidades!"}
+            if scarcity > 0
+            else None
+        ),
+        "contenido": content,  # resto de secciones editables (benefits, rating, landing…)
     }
 
 

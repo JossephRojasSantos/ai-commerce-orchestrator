@@ -95,3 +95,66 @@ async def test_order_copy_validation(store_client):
         "/v1/store/orders", headers=AUTH, json={"shopOrderId": "", "total": 0}
     )
     assert resp.status_code == 422
+
+
+def test_to_dto_maps_landing_content():
+    """Reviews/faq/escasez reales viven en content.landing (feature 019)."""
+    from types import SimpleNamespace
+
+    from app.services.store import _to_dto
+
+    p = SimpleNamespace(
+        slug="delantal",
+        name="Delantal",
+        price=29900,
+        anchor_price=None,
+        description="d",
+        short_description="c",
+        dropi_product_id=None,
+        dropi_supplier_id=None,
+        images=["https://x/img.jpg"],
+        content={
+            "reviews": "210",  # contador, NO las reseñas
+            "rating": "4.8",
+            "landing": {
+                "reviews": [{"name": "Maria", "city": "Cali", "stars": 5, "text": "Excelente"}],
+                "faq": [{"q": "¿Cómo pago?", "a": "Contraentrega"}],
+                "scarcity_units": 7,
+                "price_old": 49900,
+                "compare": [],
+            },
+        },
+    )
+    dto = _to_dto(p)  # type: ignore[arg-type]
+    assert dto["resenas"] == [
+        {"autor": "Maria — Cali", "estrellas": 5, "texto": "Excelente", "foto": None}
+    ]
+    assert dto["faq"] == [{"pregunta": "¿Cómo pago?", "respuesta": "Contraentrega"}]
+    assert dto["escasez"] == {"activa": True, "mensaje": "¡Quedan solo 7 unidades!"}
+    assert dto["precioAncla"] == 49900.0
+    assert dto["comparativa"] is None
+
+
+def test_to_dto_tolerates_malformed_content():
+    """Strings donde se esperan listas no deben tumbar el catálogo."""
+    from types import SimpleNamespace
+
+    from app.services.store import _to_dto
+
+    p = SimpleNamespace(
+        slug="x",
+        name="X",
+        price=1000,
+        anchor_price=None,
+        description="",
+        short_description="",
+        dropi_product_id=None,
+        dropi_supplier_id=None,
+        images=None,
+        content={"reviews": "210", "landing": "no-es-dict"},
+    )
+    dto = _to_dto(p)  # type: ignore[arg-type]
+    assert dto["resenas"] == []
+    assert dto["faq"] == []
+    assert dto["galeria"] == []
+    assert dto["escasez"] is None

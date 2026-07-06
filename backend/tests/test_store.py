@@ -78,7 +78,7 @@ async def test_order_copy_created(store_client):
         "total": 35000,
         "cliente": {"nombre": "Test", "telefono": "3166235026"},
         "productos": [{"id": 96, "quantity": 1, "price": 35000, "user_id": 923}],
-        "dropi": {"isSuccess": True, "order": {"id": 555}},
+        "dropi": {"isSuccess": True, "objects": {"id": 555}},
     }
     with patch(
         "app.routers.store.store.save_order", new_callable=AsyncMock, return_value=1

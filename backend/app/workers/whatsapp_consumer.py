@@ -78,16 +78,18 @@ async def _handle(message: dict) -> None:
     if not phone or not text:
         return
 
-    if not settings.WA_BOT_ENABLED:
-        logger.info("wa.consumer.bot_disabled_skip", phone=phone)
-        return
-
-    # Persistir el entrante y decidir si el bot responde (modo humano — FR-011)
+    # Persistir el entrante SIEMPRE (aparece en el inbox admin), y decidir si el
+    # bot responde (modo humano — FR-011). El kill switch se evalúa DESPUÉS para
+    # no perder mensajes: con el bot apagado igual entran a la bandeja.
     bot_should_reply = True
     try:
         bot_should_reply = await wa_inbox.record_incoming(phone, text, name=profile_name or None)
     except Exception as exc:  # noqa: BLE001 — la persistencia no bloquea al bot
         logger.warning("wa.consumer.persist_failed", phone=phone, error=str(exc))
+
+    if not settings.WA_BOT_ENABLED:
+        logger.info("wa.consumer.bot_disabled_skip", phone=phone)
+        return
 
     if not bot_should_reply:
         logger.info("wa.consumer.human_mode_skip", phone=phone)

@@ -6,7 +6,13 @@ from app.services import orders as order_service
 
 # Estados WC válidos para filtrar (evita pasar valores arbitrarios a la API de WooCommerce)
 _ALLOWED_ORDER_STATUSES = {
-    "pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed",
+    "pending",
+    "processing",
+    "on-hold",
+    "completed",
+    "cancelled",
+    "refunded",
+    "failed",
 }
 
 # Endpoints con PII de clientes: exigen key interna (server-to-server), no la key pública web.

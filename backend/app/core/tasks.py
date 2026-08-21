@@ -4,6 +4,7 @@
 a mitad de ejecución (footgun documentado de asyncio). `spawn()` guarda la referencia
 en un set a nivel de módulo y la descarta al completarse.
 """
+
 from __future__ import annotations
 
 import asyncio

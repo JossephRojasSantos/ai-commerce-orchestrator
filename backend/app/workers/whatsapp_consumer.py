@@ -25,6 +25,7 @@ async def _handle_bounded(message: dict) -> None:
     async with _semaphore:
         await _handle(message)
 
+
 # Placeholder legible por tipo para no perder contexto del hilo (feature 013)
 _MEDIA_LABELS = {
     "image": "[imagen]",

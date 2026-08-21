@@ -33,7 +33,7 @@ docker compose -f infra/docker-compose.yml run --rm backend sh -c "pip install p
 
 Monorepo with four containerized services orchestrated via Docker Compose:
 
-- **backend** — Python 3.11-slim, port 8000 (configurable via `BACKEND_PORT`). Currently a placeholder; FastAPI + Uvicorn will be implemented here.
+- **backend** — Python 3.12-slim, port 8000 (configurable via `BACKEND_PORT`). FastAPI + Uvicorn + LangGraph, implemented. Capas `routers/` → `services/` → `clients/`, con `core/` (auth, cache, retry, tasks, metrics), `workers/` (consumers WhatsApp por Redis) y `services/orchestrator/` (grafo LangGraph: router de intención + agentes chat/tracking/reco/fallback con circuit breaker). RAG con Qdrant. LLM vía OpenRouter/OpenAI. ~26 tests, `fail_under=90`.
 - **db** — PostgreSQL 16-alpine, port 5432. Persisted via `ai-db-data` volume.
 - **redis** — Redis 7-alpine, port 6379. AOF persistence enabled. Used for caching and Celery task queues.
 - **rabbitmq** — RabbitMQ 3-management-alpine, ports 5672/15672. Persisted via `ai-rabbitmq-data` volume.
@@ -63,7 +63,7 @@ The project runs on **Apple Silicon (ARM64)** via **Colima** (not Docker Desktop
 
 ```
 ai-commerce-orchestrator/
-├── backend/          # Python backend service (FastAPI — to be implemented)
+├── backend/          # Python backend service (FastAPI + LangGraph, implementado)
 ├── infra/
 │   ├── docker/       # Dockerfiles and nginx configs (to be added)
 │   └── docker-compose.yml

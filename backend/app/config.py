@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     WA_APP_SECRET: str = ""
     WA_API_VERSION: str = "v25.0"
     WA_RATE_LIMIT_PER_HOUR: int = 10
+    # Kill switch: en False, el consumer sigue leyendo la cola pero no responde nada.
+    WA_BOT_ENABLED: bool = True
     # Fase 3 — interpretación de adjuntos (imagen/audio) vía LLM multimodal.
     # OFF por defecto: hasta activarlo, los adjuntos caen al placeholder type-aware.
     WA_MEDIA_ENABLED: bool = False
@@ -58,6 +60,8 @@ class Settings(BaseSettings):
     ORCHESTRATOR_AGENT_TIMEOUT: float = 15.0
     ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD: int = 3
     ORCHESTRATOR_RATE_LIMIT_PER_MIN: int = 20
+    # Límite de mensajes procesados por IP/min en el WebSocket de chat (protege coste LLM)
+    WS_RATE_LIMIT_PER_MIN: int = 20
     INTENT_CACHE_TTL: int = 3600
 
     # RAG / Vector DB (AI-29)
@@ -74,7 +78,10 @@ class Settings(BaseSettings):
     RAG_LLM_ENABLED: bool = True
 
     # Auth & rate limiting
-    ALLOWED_API_KEYS: list[str] = []
+    ALLOWED_API_KEYS: list[str] = []  # key(s) públicas (chat/RAG) — pueden llegar al navegador
+    # Keys privilegiadas server-to-server (WP backend). Requeridas para endpoints con PII
+    # (órdenes). NUNCA deben exponerse al navegador. Vacío = endpoints de órdenes cerrados.
+    INTERNAL_API_KEYS: list[str] = []
     IP_RATE_LIMIT_PER_MIN: int = 60
 
     # Admin panel (feature 012)
@@ -102,6 +109,8 @@ class Settings(BaseSettings):
         ' "meta-llama/llama-3.1-8b-instruct": [0.02, 0.03]}'
     )
     WA_HUMAN_PAUSE_HOURS: int = 12  # pausa del bot tras respuesta manual
+    # Máx. mensajes WhatsApp procesados en paralelo (acota fan-out de coste LLM, N3)
+    WA_CONSUMER_MAX_CONCURRENCY: int = 5
 
     # Product Scout — catálogo Dropi (feature 014)
     DROPI_INTEGRATION_KEY: str = ""  # token de integración (Chatbot Agents); catálogo/scout

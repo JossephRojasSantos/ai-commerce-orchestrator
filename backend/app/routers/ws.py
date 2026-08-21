@@ -7,6 +7,7 @@ import structlog
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.config import settings
+from app.core.cache import get_redis
 from app.services.orchestrator.graph import process_message
 
 logger = structlog.get_logger()
@@ -72,6 +73,7 @@ async def ws_chat(
     session_id = str(uuid.uuid4())
     user_id = f"ws:{session_id}"
     trace_id = session_id
+    client_ip = websocket.client.host if websocket.client else "unknown"
 
     logger.info("ws_chat_connected", session_id=session_id)
 
@@ -96,6 +98,27 @@ async def ws_chat(
             text = (msg.get("content") or "").strip()
             if not text:
                 continue
+
+            # Rate-limit por IP antes de invocar el LLM (N2: acota coste y DoS)
+            try:
+                redis = get_redis()
+                rate_key = f"ratelimit:ws:{client_ip}"
+                count = await redis.incr(rate_key)
+                if count == 1:
+                    await redis.expire(rate_key, 60)
+                if count > settings.WS_RATE_LIMIT_PER_MIN:
+                    logger.warning("ws_chat_rate_limited", session_id=session_id, ip=client_ip)
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "type": "text",
+                                "content": "Has enviado demasiados mensajes. Espera un momento e intenta de nuevo.",
+                            }
+                        )
+                    )
+                    continue
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("ws_ratelimit_unavailable", error=str(exc), session_id=session_id)
 
             await websocket.send_text(json.dumps({"type": "typing"}))
 

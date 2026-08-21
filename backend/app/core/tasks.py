@@ -7,7 +7,7 @@ en un set a nivel de módulo y la descarta al completarse.
 from __future__ import annotations
 
 import asyncio
-from typing import Coroutine
+from collections.abc import Coroutine
 
 _background_tasks: set[asyncio.Task] = set()
 

@@ -192,7 +192,7 @@ async def list_orders(
 @router.post("/orders/sync", status_code=202)
 async def orders_sync_trigger(_: str = Depends(require_admin_session)) -> dict:
     """Dispara la sincronización Dropi → WooCommerce en background (feature 016)."""
-    import asyncio
+    from app.core.tasks import spawn
 
     from app.config import settings
     from app.workers.dropi_order_sync import SYNC_LOCK_KEY, run_sync_locked
@@ -201,7 +201,7 @@ async def orders_sync_trigger(_: str = Depends(require_admin_session)) -> dict:
         raise HTTPException(status_code=503, detail="dropi_sync_disabled") from None
     if await _scout_lock_active(SYNC_LOCK_KEY):
         raise HTTPException(status_code=409, detail="already_running") from None
-    asyncio.get_running_loop().create_task(run_sync_locked())
+    spawn(run_sync_locked())
     return {"status": "running", "kind": "order_sync"}
 
 
@@ -663,25 +663,25 @@ async def scout_runs(
 
 @router.post("/scout/ingest", status_code=202)
 async def scout_ingest_trigger(_: str = Depends(require_admin_session)) -> dict:
-    import asyncio
+    from app.core.tasks import spawn
 
     from app.workers.scout_ingest import INGEST_LOCK_KEY, run_ingest_locked
 
     if await _scout_lock_active(INGEST_LOCK_KEY):
         raise HTTPException(status_code=409, detail="already_running") from None
-    asyncio.get_running_loop().create_task(run_ingest_locked())
+    spawn(run_ingest_locked())
     return {"status": "running", "kind": "ingest"}
 
 
 @router.post("/scout/score", status_code=202)
 async def scout_score_trigger(_: str = Depends(require_admin_session)) -> dict:
-    import asyncio
+    from app.core.tasks import spawn
 
     from app.services.admin.scout_score import SCORE_LOCK_KEY, run_scoring_locked
 
     if await _scout_lock_active(SCORE_LOCK_KEY):
         raise HTTPException(status_code=409, detail="already_running") from None
-    asyncio.get_running_loop().create_task(run_scoring_locked())
+    spawn(run_scoring_locked())
     return {"status": "running", "kind": "score"}
 
 
@@ -709,11 +709,11 @@ async def scout_demand(_: str = Depends(require_admin_session)) -> dict:
 
 @router.post("/scout/demand/refresh", status_code=202)
 async def scout_demand_refresh(_: str = Depends(require_admin_session)) -> dict:
-    import asyncio
+    from app.core.tasks import spawn
 
     from app.services.admin.scout_demand import DEMAND_LOCK_KEY, run_demand_locked
 
     if await _scout_lock_active(DEMAND_LOCK_KEY):
         raise HTTPException(status_code=409, detail="already_running") from None
-    asyncio.get_running_loop().create_task(run_demand_locked())
+    spawn(run_demand_locked())
     return {"status": "running", "kind": "demand"}

@@ -7,6 +7,7 @@ import structlog
 
 from app.config import settings
 from app.core.cache import get_redis
+from app.core.tasks import spawn
 from app.integrations.whatsapp.client import send_text_message
 from app.services import wa_inbox
 from app.services.orchestrator.graph import process_message
@@ -15,6 +16,14 @@ logger = structlog.get_logger()
 
 _QUEUE_KEY = "whatsapp:messages:incoming"
 _BLPOP_TIMEOUT = 5
+
+# Acota cuántos mensajes se procesan en paralelo para no disparar fan-out de LLM (N3)
+_semaphore = asyncio.Semaphore(settings.WA_CONSUMER_MAX_CONCURRENCY)
+
+
+async def _handle_bounded(message: dict) -> None:
+    async with _semaphore:
+        await _handle(message)
 
 # Placeholder legible por tipo para no perder contexto del hilo (feature 013)
 _MEDIA_LABELS = {
@@ -66,6 +75,10 @@ async def _handle(message: dict) -> None:
         return
 
     if not phone or not text:
+        return
+
+    if not settings.WA_BOT_ENABLED:
+        logger.info("wa.consumer.bot_disabled_skip", phone=phone)
         return
 
     # Persistir el entrante y decidir si el bot responde (modo humano — FR-011)
@@ -122,7 +135,7 @@ async def run_consumer(stop_event: asyncio.Event) -> None:
                 continue
             _, raw = result
             message = json.loads(raw)
-            asyncio.create_task(_handle(message))
+            spawn(_handle_bounded(message))
         except asyncio.CancelledError:
             break
         except Exception as exc:

@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS wa_messages (
     delivered BOOLEAN DEFAULT 1,
     wa_message_id TEXT,
     status TEXT,
+    media_id TEXT,
+    media_type TEXT,
+    media_mime TEXT,
+    media_filename TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """

@@ -347,6 +347,11 @@ td img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--radi
   resize: vertical;
 }
 #wa-compose textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+.wa-compose-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.wa-attach { cursor: pointer; text-align: center; padding: 6px 10px; font-size: 16px; line-height: 1; }
+.wa-file-name { font-size: 11px; color: var(--color-text-muted, #888); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-media-img { max-width: 220px; max-height: 220px; border-radius: var(--radius-input); display: block; margin-bottom: 4px; cursor: pointer; }
+.wa-media-doc { font-size: 12px; margin-bottom: 4px; }
 
 @media (max-width: 860px) {
   .wa-layout { grid-template-columns: 1fr; }

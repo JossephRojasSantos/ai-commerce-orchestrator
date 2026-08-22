@@ -48,7 +48,15 @@ def human_mode_active(conv: WaConversation) -> bool:
     return until is not None and _now() < until
 
 
-async def record_incoming(phone: str, content: str, name: str | None = None) -> bool:
+async def record_incoming(
+    phone: str,
+    content: str,
+    name: str | None = None,
+    media_id: str | None = None,
+    media_type: str | None = None,
+    media_mime: str | None = None,
+    media_filename: str | None = None,
+) -> bool:
     """Persiste un mensaje del cliente. Devuelve True si el BOT debe responder.
 
     Evalúa la expiración perezosa del modo humano (research R5).
@@ -78,7 +86,13 @@ async def record_incoming(phone: str, content: str, name: str | None = None) -> 
         conv.last_activity_at = now
         db.add(
             WaMessage(
-                conversation_id=conv.id, author="customer", content=content or NON_TEXT_PLACEHOLDER
+                conversation_id=conv.id,
+                author="customer",
+                content=content or NON_TEXT_PLACEHOLDER,
+                media_id=media_id or None,
+                media_type=media_type or None,
+                media_mime=media_mime or None,
+                media_filename=media_filename or None,
             )
         )
         await db.commit()
@@ -91,6 +105,10 @@ async def record_outgoing(
     author: str,
     delivered: bool = True,
     wa_message_id: str | None = None,
+    media_id: str | None = None,
+    media_type: str | None = None,
+    media_mime: str | None = None,
+    media_filename: str | None = None,
 ) -> None:
     """Persiste un mensaje saliente (bot o admin). Best-effort para el flujo del bot.
 
@@ -115,6 +133,10 @@ async def record_outgoing(
                 delivered=delivered,
                 wa_message_id=wa_message_id or None,
                 status="sent" if wa_message_id else None,
+                media_id=media_id or None,
+                media_type=media_type or None,
+                media_mime=media_mime or None,
+                media_filename=media_filename or None,
             )
         )
         await db.commit()
@@ -226,6 +248,10 @@ async def get_thread(phone: str) -> dict | None:
             "date": m.created_at.isoformat() if m.created_at else "",
             "delivered": m.delivered,
             "status": m.status,
+            "media_id": m.media_id,
+            "media_type": m.media_type,
+            "media_mime": m.media_mime,
+            "media_filename": m.media_filename,
         }
         for m in msgs
     ]

@@ -48,6 +48,11 @@ class WaMessage(Base):
     wa_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     # Estado de entrega Meta: sent | delivered | read | failed
     status: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Adjunto (imagen/documento). media_id = id en la Graph API (proxy de descarga).
+    media_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    media_type: Mapped[str | None] = mapped_column(String(16), nullable=True)  # image | document
+    media_mime: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    media_filename: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, index=True
     )

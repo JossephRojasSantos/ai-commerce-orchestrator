@@ -1076,6 +1076,46 @@
 
   let waLastRender = '';
 
+  // HTML del adjunto dentro de una burbuja. Imagen: <img> perezoso; documento: link de descarga.
+  function waMediaHtml(m) {
+    if (!m.media_id) return '';
+    if (m.media_type === 'image')
+      return `<img class="wa-media-img" data-media="${esc(m.media_id)}" alt="imagen" loading="lazy"><br>`;
+    return `<button type="button" class="btn-ghost wa-media-doc" data-media="${esc(m.media_id)}" data-fn="${esc(m.media_filename || 'documento')}">📄 ${esc(m.media_filename || 'documento')}</button><br>`;
+  }
+
+  // Descarga un adjunto con auth (Bearer) y devuelve un object URL, o '' si falla.
+  async function waMediaBlobUrl(mediaId) {
+    try {
+      const resp = await fetch(API + '/wa/media/' + encodeURIComponent(mediaId), {
+        headers: { Authorization: 'Bearer ' + getToken() },
+      });
+      if (!resp.ok) return '';
+      return URL.createObjectURL(await resp.blob());
+    } catch {
+      return '';
+    }
+  }
+
+  // Tras renderizar el hilo, carga imágenes en <img> y arma la descarga de documentos.
+  function loadWaMedia() {
+    document.querySelectorAll('img.wa-media-img[data-media]').forEach(async (img) => {
+      const url = await waMediaBlobUrl(img.dataset.media);
+      if (url) img.src = url;
+    });
+    document.querySelectorAll('button.wa-media-doc[data-media]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const url = await waMediaBlobUrl(btn.dataset.media);
+        if (!url) return;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = btn.dataset.fn || 'documento';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    });
+  }
+
   async function openWaThread(phone, silent = false) {
     waOpenPhone = phone;
     if (!silent) $('wa-thread').innerHTML = 'Cargando…';
@@ -1100,7 +1140,7 @@
           ${t.messages
             .map(
               (m) => `<div class="msg ${m.author === 'customer' ? 'assistant' : 'user'}">
-              ${authorLabel[m.author] || ''}${esc(m.content)}${m.delivered === false ? ' ⚠️ no entregado' : ''}
+              ${authorLabel[m.author] || ''}${waMediaHtml(m)}${esc(m.content)}${m.delivered === false ? ' ⚠️ no entregado' : ''}
               <br><small>${fmtDate(m.date)}</small></div>`
             )
             .join('')}
@@ -1109,7 +1149,13 @@
           t.window_open
             ? `<form id="wa-compose">
                 <textarea id="wa-text" rows="2" placeholder="Escribe tu respuesta…" aria-label="Respuesta"></textarea>
-                <button type="submit" class="btn-cta">Enviar</button>
+                <div class="wa-compose-actions">
+                  <label class="btn-ghost wa-attach" title="Adjuntar imagen o documento">
+                    📎<input type="file" id="wa-file" accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.txt" hidden>
+                  </label>
+                  <span id="wa-file-name" class="wa-file-name"></span>
+                  <button type="submit" class="btn-cta">Enviar</button>
+                </div>
               </form>
               <p id="wa-send-msg" class="error" aria-live="polite"></p>`
             : '<p class="empty">🔒 Ventana de 24h cerrada — no se pueden enviar mensajes libres hasta que el cliente escriba de nuevo.</p>'
@@ -1117,6 +1163,7 @@
       const msgs = $('wa-msgs');
       if (msgs) msgs.scrollTop = msgs.scrollHeight;
       if (draft && $('wa-text')) $('wa-text').value = draft;
+      loadWaMedia();
 
       const resume = $('wa-resume');
       if (resume)
@@ -1126,26 +1173,52 @@
           loadWaList();
         });
 
+      const fileInput = $('wa-file');
+      if (fileInput)
+        fileInput.addEventListener('change', () => {
+          $('wa-file-name').textContent = fileInput.files[0] ? fileInput.files[0].name : '';
+        });
+
       const form = $('wa-compose');
       if (form)
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const text = $('wa-text').value.trim();
-          if (!text) return;
-          const btn = form.querySelector('button');
+          const fileEl = $('wa-file');
+          const fileObj = fileEl && fileEl.files[0];
+          if (!text && !fileObj) return;
+          const btn = form.querySelector('button[type=submit]');
           btn.disabled = true;
           try {
-            await apiFetch(`/wa/conversations/${phone}/reply`, {
-              method: 'POST',
-              body: JSON.stringify({ text }),
-            });
+            if (fileObj) {
+              const fd = new FormData();
+              fd.append('file', fileObj);
+              if (text) fd.append('caption', text);
+              const resp = await fetch(API + `/wa/conversations/${phone}/reply-media`, {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + getToken() },
+                body: fd,
+              });
+              if (!resp.ok) {
+                const d = await resp.json().catch(() => ({}));
+                throw new Error(d.detail || 'error');
+              }
+            } else {
+              await apiFetch(`/wa/conversations/${phone}/reply`, {
+                method: 'POST',
+                body: JSON.stringify({ text }),
+              });
+            }
             openWaThread(phone);
             loadWaList();
           } catch (err) {
-            $('wa-send-msg').textContent =
-              err.message === 'window_closed'
-                ? 'La ventana de 24h se cerró — no se pudo enviar'
-                : 'No se pudo enviar el mensaje, reintenta';
+            const map = {
+              window_closed: 'La ventana de 24h se cerró — no se pudo enviar',
+              unsupported_media_type: 'Tipo de archivo no permitido (solo imagen o documento)',
+              file_too_large: 'El archivo supera el tamaño máximo (5 MB)',
+              media_upload_failed: 'No se pudo subir el adjunto, reintenta',
+            };
+            $('wa-send-msg').textContent = map[err.message] || 'No se pudo enviar el mensaje, reintenta';
             btn.disabled = false;
           }
         });

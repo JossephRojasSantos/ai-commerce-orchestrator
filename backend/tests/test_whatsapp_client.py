@@ -4,8 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.integrations.whatsapp.client import (
+    send_media_message,
     send_template_message,
     send_text_message,
+    upload_media,
 )
 
 
@@ -118,3 +120,49 @@ async def test_send_text_message_retryable_then_success():
 
     assert result.status == "sent"
     assert call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_upload_media_success():
+    resp = _mock_resp(200, {"id": "MID-99"})
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
+        media_id = await upload_media(b"bytes", "image/png", "foto.png")
+    assert media_id == "MID-99"
+
+
+@pytest.mark.asyncio
+async def test_upload_media_failure_returns_empty():
+    resp = _mock_resp(400, {"error": {"message": "bad"}})
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
+        media_id = await upload_media(b"bytes", "image/png", "foto.png")
+    assert media_id == ""
+
+
+@pytest.mark.asyncio
+async def test_send_media_message_image_success():
+    resp = _mock_resp(200, {"messages": [{"id": "msg-med"}]})
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
+        result = await send_media_message(
+            "521234567890", media_type="image", media_id="MID-1", caption="hola"
+        )
+    assert result.status == "sent"
+    assert result.message_id == "msg-med"
+
+
+@pytest.mark.asyncio
+async def test_send_media_message_document_error():
+    resp = _mock_resp(400, {"error": {"message": "nope"}})
+    with patch(
+        "app.integrations.whatsapp.client.httpx.AsyncClient", return_value=_make_client_ctx(resp)
+    ):
+        result = await send_media_message(
+            "521234567890", media_type="document", media_id="MID-2", filename="guia.pdf"
+        )
+    assert result.status == "failed"
+    assert "400" in result.error

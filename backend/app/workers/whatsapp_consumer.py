@@ -67,11 +67,20 @@ async def _handle(message: dict) -> None:
 
     if not text and msg_type not in ("text", "button"):
         logger.info("wa.consumer.unsupported_type", msg_type=msg_type, phone=phone)
-        # Persistir placeholder type-aware para que el hilo no pierda contexto (feature 013)
+        # Persistir placeholder type-aware para que el hilo no pierda contexto (feature 013).
+        # Para imagen/documento se guarda también el media_id para verlo en el inbox admin.
         if phone:
+            obj = message.get(msg_type) or {}
+            is_viewable = msg_type in ("image", "document")
             with contextlib.suppress(Exception):
                 await wa_inbox.record_incoming(
-                    phone, _media_placeholder(message, msg_type), name=profile_name or None
+                    phone,
+                    _media_placeholder(message, msg_type),
+                    name=profile_name or None,
+                    media_id=obj.get("id") if is_viewable else None,
+                    media_type=msg_type if is_viewable else None,
+                    media_mime=obj.get("mime_type") if is_viewable else None,
+                    media_filename=obj.get("filename") if is_viewable else None,
                 )
         return
 

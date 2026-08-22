@@ -8,7 +8,8 @@ Regla de oro: ningún endpoint devuelve meta_data crudo de WooCommerce
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 
@@ -491,6 +492,99 @@ async def wa_reply(
         "mode": "human",
         "human_until": conv.human_until.isoformat() if conv and conv.human_until else None,
     }
+
+
+# Tipos de adjunto permitidos desde el inbox admin (imagen + documento).
+_WA_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp"}
+_WA_DOC_MIMES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+}
+
+
+@router.post("/wa/conversations/{phone}/reply-media")
+async def wa_reply_media(
+    phone: str,
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    _: str = Depends(require_admin_session),
+) -> dict:
+    from app.config import settings
+    from app.integrations.whatsapp.client import send_media_message, upload_media
+    from app.services import wa_inbox
+
+    mime = file.content_type or ""
+    if mime in _WA_IMAGE_MIMES:
+        media_type = "image"
+    elif mime in _WA_DOC_MIMES:
+        media_type = "document"
+    else:
+        raise HTTPException(status_code=415, detail="unsupported_media_type") from None
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="empty_file") from None
+    if len(data) > settings.WA_MEDIA_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="file_too_large") from None
+
+    thread = await wa_inbox.get_thread(phone)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="conversation_not_found") from None
+    if not thread["window_open"]:
+        raise HTTPException(status_code=409, detail="window_closed") from None
+
+    media_id = await upload_media(data, mime, file.filename or "adjunto")
+    if not media_id:
+        raise HTTPException(status_code=502, detail="media_upload_failed") from None
+
+    result = await send_media_message(
+        wa_inbox.normalize_phone(phone),
+        media_type=media_type,
+        media_id=media_id,
+        caption=caption or None,
+        filename=file.filename,
+    )
+    delivered = result.status == "sent"
+    await wa_inbox.record_outgoing(
+        phone,
+        caption or f"[{'imagen' if media_type == 'image' else 'documento'}]",
+        author="admin",
+        delivered=delivered,
+        wa_message_id=result.message_id or None,
+        media_id=media_id,
+        media_type=media_type,
+        media_mime=mime,
+        media_filename=file.filename,
+    )
+    if not delivered:
+        raise HTTPException(status_code=502, detail="whatsapp_send_failed") from None
+
+    conv = await wa_inbox.set_mode(phone, "human")
+    logger.info("admin.wa_reply_media_sent", phone=phone, media_type=media_type)
+    return {
+        "ok": True,
+        "mode": "human",
+        "human_until": conv.human_until.isoformat() if conv and conv.human_until else None,
+    }
+
+
+@router.get("/wa/media/{media_id}")
+async def wa_media_proxy(media_id: str, _: str = Depends(require_admin_session)) -> Response:
+    """Proxy autenticado: descarga un adjunto de la Graph API para verlo en el inbox."""
+    from app.integrations.whatsapp.media import download_media
+
+    data, mime = await download_media(media_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="media_not_found") from None
+    return Response(
+        content=data,
+        media_type=mime or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.post("/wa/conversations/{phone}/resume-bot")

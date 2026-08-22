@@ -34,6 +34,81 @@ async def send_text_message(phone: str, text: str) -> WASendResult:
     return await send_whatsapp_message(phone=phone, text=text)
 
 
+async def upload_media(data: bytes, mime: str, filename: str) -> str:
+    """Sube un adjunto a la Graph API y devuelve su media_id (o "" si falla)."""
+    url = f"{settings.WA_API_BASE}/{settings.WA_ACTIVE_PHONE_ID}/media"
+    headers = {"Authorization": f"Bearer {settings.WA_ACCESS_TOKEN}"}
+    files = {
+        "file": (filename or "file", data, mime or "application/octet-stream"),
+        "messaging_product": (None, "whatsapp"),
+        "type": (None, mime or "application/octet-stream"),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(url, files=files, headers=headers)
+        if r.status_code == 200:
+            media_id = r.json().get("id", "")
+            logger.info("wa.media_uploaded", media_id=media_id, mime=mime)
+            return media_id
+        _, err_msg = _parse_meta_error(r)
+        logger.error("wa.media_upload_error", status=r.status_code, error_message=err_msg)
+    except httpx.RequestError as exc:
+        logger.error("wa.media_upload_error", error=str(exc))
+    return ""
+
+
+async def send_media_message(
+    phone: str,
+    media_type: str,
+    media_id: str,
+    caption: str | None = None,
+    filename: str | None = None,
+) -> WASendResult:
+    """Envía un adjunto ya subido (media_id). media_type: image | document."""
+    obj: dict = {"id": media_id}
+    if caption:
+        obj["caption"] = caption
+    if media_type == "document" and filename:
+        obj["filename"] = filename
+    body = {
+        "messaging_product": "whatsapp",
+        "to": phone,
+        "type": media_type,
+        media_type: obj,
+    }
+    url = f"{settings.WA_API_BASE}/{settings.WA_ACTIVE_PHONE_ID}/messages"
+    headers = {"Authorization": f"Bearer {settings.WA_ACCESS_TOKEN}"}
+
+    for attempt in range(_MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(url, json=body, headers=headers)
+            if r.status_code == 200:
+                message_id = r.json()["messages"][0]["id"]
+                logger.info("wa.sent", phone=phone, message_id=message_id, media_type=media_type)
+                return WASendResult(message_id=message_id, status="sent")
+            if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
+                await asyncio.sleep(2**attempt)
+                continue
+            err_code, err_msg = _parse_meta_error(r)
+            logger.error(
+                "wa.send_error", status=r.status_code, error_code=err_code, error_message=err_msg
+            )
+            return WASendResult(
+                message_id="",
+                status="failed",
+                error=f"HTTP {r.status_code}: {err_msg}",
+                error_code=err_code,
+            )
+        except httpx.RequestError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                await asyncio.sleep(2**attempt)
+                continue
+            return WASendResult(message_id="", status="failed", error=str(exc))
+
+    return WASendResult(message_id="", status="failed", error="max retries exceeded")
+
+
 async def send_template_message(
     phone: str,
     template_name: str,
